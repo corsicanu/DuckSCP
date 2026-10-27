@@ -1,0 +1,84 @@
+<!doctype html><html><head><meta charset=utf-8><title>B · Classic refined</title><style>
+:root{--win:#ececec;--content:#fff;--sep:#e1e1e3;--label:#1d1d1f;--sec:#6e6e73;--ter:#a1a1a6;--accent:#007aff;
+--sel:#dce9ff;--up:#e2403a;--down:#2f7fe0;--duck:#f5b82e;--side:#e8e8ea}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#b9bec7;font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;color:var(--label);
+-webkit-font-smoothing:antialiased;padding:28px;font-variant-numeric:tabular-nums}
+.window{width:1224px;height:744px;border-radius:12px;overflow:hidden;background:var(--win);
+box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 24px 60px rgba(0,0,0,.28);display:flex;flex-direction:column}
+.lights{display:flex;gap:8px}.lights i{width:12px;height:12px;border-radius:50%;display:block}
+.lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.sym{width:16px;height:16px;display:inline-block;vertical-align:-3px;color:var(--sec)}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;color:var(--sec);font-size:11.5px;text-align:left;padding:5px 10px;border-bottom:1px solid var(--sep)}
+td{padding:4px 10px;white-space:nowrap}
+td.num,th.num{text-align:right}
+td.dim{color:var(--sec)}
+.ico{width:16px;height:16px;border-radius:3px;display:inline-block;vertical-align:-3px;margin-right:7px}
+.folder{background:linear-gradient(#7cc4ff,#3b9bf0)}
+.file{background:#fff;box-shadow:inset 0 0 0 1px #c9c9ce}
+.parent{background:none;box-shadow:none;color:var(--ter)}
+
+.titlebar{height:38px;display:flex;align-items:center;padding:0 12px;gap:14px}
+.titlebar .t{flex:1;text-align:center;font-weight:600;font-size:13px;margin-right:52px}
+.tools{display:flex;gap:4px;padding:0 10px 8px;align-items:center}
+.tools button{border:0;background:none;font:inherit;padding:5px 9px;border-radius:6px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;color:var(--label)}
+.tools button span{font-size:15px}
+.tools .gap{flex:1}
+.tabs{display:flex;gap:1px;padding:0 10px;background:var(--win);border-bottom:1px solid var(--sep)}
+.tabs div{padding:6px 16px;border-radius:7px 7px 0 0;color:var(--sec);display:flex;gap:8px;align-items:center}
+.tabs .on{background:var(--content);color:var(--label);box-shadow:0 -1px 0 var(--sep) inset}
+.tabs .sw{width:8px;height:8px;border-radius:2px}
+.panes{flex:1;display:flex;gap:1px;background:var(--sep);min-height:0}
+.pane{flex:1;background:var(--content);display:flex;flex-direction:column;position:relative}
+.pane.active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.path{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--sep)}
+.path .field{flex:1;background:#f4f4f6;border-radius:6px;padding:4px 9px;color:var(--label);font-size:12px}
+.path .field em{font-style:normal;color:var(--sec)}
+.nav{color:var(--sec);letter-spacing:6px}
+tr:nth-child(even) td{background:#fafafb}
+tr.sel td{background:var(--sel)!important}
+.pane.active tr.sel td{background:var(--accent)!important;color:#fff}.pane.active tr.sel td.dim{color:#e6efff}
+.queue{height:96px;background:var(--content);border-top:1px solid var(--sep)}
+.q{display:grid;grid-template-columns:22px 1fr 1fr 150px 70px;align-items:center;gap:10px;padding:6px 12px;font-size:12px;border-bottom:1px solid #f1f1f3}
+.q .bar{height:5px;border-radius:3px;background:#e8e8ec;overflow:hidden}.q .bar i{display:block;height:100%;background:var(--accent)}
+.fkeys{display:flex;gap:6px;padding:7px 10px;background:var(--win);border-top:1px solid var(--sep)}
+.fkeys span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--label);padding:3px 8px 3px 4px;border-radius:6px}
+.fkeys kbd{font:600 10.5px -apple-system;background:#fff;border-radius:4px;padding:2px 5px;box-shadow:0 1px 0 #c7c7cc,0 0 0 .5px #c7c7cc;color:var(--sec)}
+.status{display:flex;gap:14px;padding:4px 12px 6px;font-size:11px;color:var(--sec);background:var(--win)}
+.status .pill{background:#e3f6e7;color:#1c7c35;border-radius:9px;padding:0 8px}
+.status .r{margin-left:auto}
+</style></head><body><div class=window>
+<div class=titlebar><div class=lights><i></i><i></i><i></i></div><div class=t>html — deploy@web01.example.com</div></div>
+<div class=tools><button><span>＋</span>New Session</button><button><span>☰</span>Sites</button><button><span>⏏</span>Disconnect</button>
+<button><span>⇅</span>Synchronize</button><button><span>◉</span>Keep Up to Date</button><button><span>⌕</span>Find</button><div class=gap></div>
+<button><span>↻</span>Refresh</button><button><span>≡</span>Queue</button></div>
+<div class=tabs><div class=on><i class=sw style="background:#ff8a00"></i>web-01</div><div><i class=sw style="background:#8e8e93"></i>db server</div><div>＋</div></div>
+<div class=panes>
+<section class="pane active"><div class=path><span class=nav>‹ › ↑</span><div class=field><em>~ / Projects /</em> web</div></div>
+<table><tr><th>Name</th><th class=num>Size</th><th>Modified</th></tr><tr><td><span class="ico parent">↰</span>..</td><td class="num dim"></td><td class="dim"></td></tr>
+<tr><td><span class="ico folder"></span>assets</td><td class="num dim"></td><td class="dim">Today 09:12</td></tr>
+<tr><td><span class="ico folder"></span>css</td><td class="num dim"></td><td class="dim">Yesterday 18:40</td></tr>
+<tr class="sel"><td><span class="ico file"></span>index.html</td><td class="num dim">14 KB</td><td class="dim">Today 09:30</td></tr>
+<tr class="sel"><td><span class="ico file"></span>app.js</td><td class="num dim">212 KB</td><td class="dim">Today 09:28</td></tr>
+<tr><td><span class="ico file"></span>logo.svg</td><td class="num dim">3 KB</td><td class="dim">12 Oct 2026</td></tr>
+<tr><td><span class="ico file"></span>robots.txt</td><td class="num dim">68 bytes</td><td class="dim">2 Sep 2026</td></tr>
+<tr><td><span class="ico file"></span>deploy.sh</td><td class="num dim">1 KB</td><td class="dim">21 Oct 2026</td></tr></table></section>
+<section class=pane><div class=path><span class=nav>‹ › ↑</span><div class=field><em>/ var / www /</em> html</div></div>
+<table><tr><th>Name</th><th class=num>Size</th><th>Modified</th><th>Rights</th></tr><tr><td><span class="ico parent">↰</span>..</td><td class="num dim"></td><td class="dim"></td><td class="dim"></td></tr>
+<tr><td><span class="ico folder"></span>assets</td><td class="num dim"></td><td class="dim">Today 09:10</td><td class="dim">rwxr-xr-x</td></tr>
+<tr><td><span class="ico folder"></span>css</td><td class="num dim"></td><td class="dim">20 Oct 2026</td><td class="dim">rwxr-xr-x</td></tr>
+<tr><td><span class="ico folder"></span>uploads</td><td class="num dim"></td><td class="dim">Today 08:02</td><td class="dim">rwxrwxr-x</td></tr>
+<tr><td><span class="ico file"></span>index.html</td><td class="num dim">13 KB</td><td class="dim">Yesterday 22:11</td><td class="dim">rw-r--r--</td></tr>
+<tr><td><span class="ico file"></span>app.js</td><td class="num dim">208 KB</td><td class="dim">Yesterday 22:11</td><td class="dim">rw-r--r--</td></tr>
+<tr><td><span class="ico file"></span>.htaccess</td><td class="num dim">512 bytes</td><td class="dim">3 Sep 2026</td><td class="dim">rw-r--r--</td></tr>
+<tr><td><span class="ico file"></span>robots.txt</td><td class="num dim">68 bytes</td><td class="dim">2 Sep 2026</td><td class="dim">rw-r--r--</td></tr></table></section>
+</div>
+<div class=queue>
+<div class=q><span style="color:var(--accent)">↑</span><span>~/Projects/web/app.js</span><span class=dim style="color:var(--sec)">/var/www/html</span><span class=bar><i style="width:62%"></i></span><span>2.1 MB/s</span></div>
+<div class=q><span style="color:var(--sec)">↓</span><span>/var/www/html/uploads</span><span style="color:var(--sec)">~/Downloads</span><span class=bar><i style="width:0"></i></span><span style="color:var(--sec)">Waiting</span></div>
+</div>
+<div class=fkeys><span><kbd>F2</kbd>Rename</span><span><kbd>F4</kbd>Edit</span><span><kbd>F5</kbd>Copy</span><span><kbd>F6</kbd>Move</span>
+<span><kbd>F7</kbd>New Folder</span><span><kbd>F8</kbd>Delete</span><span><kbd>F9</kbd>Properties</span></div>
+<div class=status><span>2 of 7 selected · 226 KB</span><span class=r><span class=pill>🔒 SFTP-3</span></span><span>0:12:04</span></div>
+</div></body></html>

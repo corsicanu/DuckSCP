@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset=utf-8><title>A · Native</title><style>
+:root{--win:#ececec;--content:#fff;--sep:#e1e1e3;--label:#1d1d1f;--sec:#6e6e73;--ter:#a1a1a6;--accent:#007aff;
+--sel:#dce9ff;--up:#e2403a;--down:#2f7fe0;--duck:#f5b82e;--side:#e8e8ea}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#b9bec7;font:13px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;color:var(--label);
+-webkit-font-smoothing:antialiased;padding:28px;font-variant-numeric:tabular-nums}
+.window{width:1224px;height:744px;border-radius:12px;overflow:hidden;background:var(--win);
+box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 24px 60px rgba(0,0,0,.28);display:flex;flex-direction:column}
+.lights{display:flex;gap:8px}.lights i{width:12px;height:12px;border-radius:50%;display:block}
+.lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.sym{width:16px;height:16px;display:inline-block;vertical-align:-3px;color:var(--sec)}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;color:var(--sec);font-size:11.5px;text-align:left;padding:5px 10px;border-bottom:1px solid var(--sep)}
+td{padding:4px 10px;white-space:nowrap}
+td.num,th.num{text-align:right}
+td.dim{color:var(--sec)}
+.ico{width:16px;height:16px;border-radius:3px;display:inline-block;vertical-align:-3px;margin-right:7px}
+.folder{background:linear-gradient(#7cc4ff,#3b9bf0)}
+.file{background:#fff;box-shadow:inset 0 0 0 1px #c9c9ce}
+.parent{background:none;box-shadow:none;color:var(--ter)}
+
+.window{flex-direction:row}
+.sidebar{width:228px;background:rgba(232,232,236,.92);border-right:1px solid var(--sep);padding:12px 10px;display:flex;flex-direction:column;gap:3px}
+.sidebar .lights{margin:2px 6px 18px}
+.sidebar h4{font-size:11px;font-weight:600;color:var(--ter);margin:10px 8px 4px}
+.sidebar a{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;color:var(--label);text-decoration:none}
+.sidebar a.on{background:rgba(0,0,0,.08);font-weight:500}
+.dot{width:7px;height:7px;border-radius:50%;background:#28c840;margin-left:auto}
+.main{flex:1;display:flex;flex-direction:column;background:var(--content)}
+.toolbar{height:52px;display:flex;align-items:center;gap:6px;padding:0 14px;border-bottom:1px solid var(--sep);background:var(--win)}
+.toolbar .title{font-weight:600;font-size:13px}.toolbar .sub{color:var(--sec);font-size:11px}
+.tb{display:flex;gap:2px;margin-left:auto}
+.tb button{border:0;background:none;padding:6px 9px;border-radius:6px;font:inherit;color:var(--label);display:flex;align-items:center;gap:6px}
+.tb button:hover{background:rgba(0,0,0,.06)}
+.tb .primary{background:var(--accent);color:#fff;padding:6px 12px}
+.panes{flex:1;display:flex}
+.pane{flex:1;display:flex;flex-direction:column;min-width:0}
+.pane+.pane{border-left:1px solid var(--sep)}
+.crumbs{display:flex;align-items:center;gap:4px;padding:8px 12px;font-size:12px;color:var(--sec);border-bottom:1px solid var(--sep)}
+.crumbs b{color:var(--label);font-weight:500}
+.crumbs .host{padding:1px 7px;border-radius:5px;background:#f0f0f2;color:var(--label)}
+tr.sel td{background:var(--sel)}
+.pane.active tr.sel td{background:var(--accent);color:#fff}.pane.active tr.sel td.dim{color:#e6efff}
+.foot{display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;color:var(--sec);border-top:1px solid var(--sep);background:#fafafa}
+.transfer{display:flex;align-items:center;gap:10px;font-size:11px}
+.bar{width:140px;height:5px;border-radius:3px;background:#e4e4e8;overflow:hidden}.bar i{display:block;height:100%;width:62%;background:var(--accent)}
+</style></head><body><div class=window>
+<nav class=sidebar><div class=lights><i></i><i></i><i></i></div>
+<h4>Open</h4>
+<a class=on><span class=sym>🖥</span>web-01<span class=dot></span></a>
+<a><span class=sym>🖥</span>db server<span class=dot></span></a>
+<h4>Sites</h4>
+<a><span class=sym>📁</span>Production</a><a><span class=sym>📁</span>Staging</a><a><span class=sym>📁</span>Clients</a>
+<a><span class=sym>🖥</span>localhost test</a>
+<h4>Workspaces</h4><a><span class=sym>▤</span>My Workspace</a>
+</nav>
+<div class=main>
+<div class=toolbar><div><div class=title>web-01</div><div class=sub>deploy@web01.example.com · SFTP-3 · 0:12:04</div></div>
+<div class=tb><button>⇅ Synchronize</button><button>⌕ Find</button><button>◫ Queue (1)</button><button class=primary>Upload 2 items</button></div></div>
+<div class=panes>
+<section class="pane active"><div class=crumbs><span class=host>This Mac</span>›Projects›<b>web</b></div>
+<table><tr><th>Name</th><th class=num>Size</th><th>Modified</th></tr><tr><td><span class="ico parent">↰</span>..</td><td class="num dim"></td><td class="dim"></td></tr>
+<tr><td><span class="ico folder"></span>assets</td><td class="num dim"></td><td class="dim">Today 09:12</td></tr>
+<tr><td><span class="ico folder"></span>css</td><td class="num dim"></td><td class="dim">Yesterday 18:40</td></tr>
+<tr class="sel"><td><span class="ico file"></span>index.html</td><td class="num dim">14 KB</td><td class="dim">Today 09:30</td></tr>
+<tr class="sel"><td><span class="ico file"></span>app.js</td><td class="num dim">212 KB</td><td class="dim">Today 09:28</td></tr>
+<tr><td><span class="ico file"></span>logo.svg</td><td class="num dim">3 KB</td><td class="dim">12 Oct 2026</td></tr>
+<tr><td><span class="ico file"></span>robots.txt</td><td class="num dim">68 bytes</td><td class="dim">2 Sep 2026</td></tr>
+<tr><td><span class="ico file"></span>deploy.sh</td><td class="num dim">1 KB</td><td class="dim">21 Oct 2026</td></tr></table>
+<div style=flex:1></div><div class=foot><span>2 of 7 selected · 226 KB</span><span>Folders first</span></div></section>
+<section class=pane><div class=crumbs><span class=host>web01.example.com</span>›var›www›<b>html</b></div>
+<table><tr><th>Name</th><th class=num>Size</th><th>Modified</th><th>Permissions</th></tr><tr><td><span class="ico parent">↰</span>..</td><td class="num dim"></td><td class="dim"></td><td class="dim"></td></tr>
+<tr><td><span class="ico folder"></span>assets</td><td class="num dim"></td><td class="dim">Today 09:10</td><td class="dim">rwxr-xr-x</td></tr>
+<tr><td><span class="ico folder"></span>css</td><td class="num dim"></td><td class="dim">20 Oct 2026</td><td class="dim">rwxr-xr-x</td></tr>
+<tr><td><span class="ico folder"></span>uploads</td><td class="num dim"></td><td class="dim">Today 08:02</td><td class="dim">rwxrwxr-x</td></tr>
+<tr><td><span class="ico file"></span>index.html</td><td class="num dim">13 KB</td><td class="dim">Yesterday 22:11</td><td class="dim">rw-r--r--</td></tr>
+<tr class="sel"><td><span class="ico file"></span>app.js</td><td class="num dim">208 KB</td><td class="dim">Yesterday 22:11</td><td class="dim">rw-r--r--</td></tr>
+<tr><td><span class="ico file"></span>.htaccess</td><td class="num dim">512 bytes</td><td class="dim">3 Sep 2026</td><td class="dim">rw-r--r--</td></tr>
+<tr><td><span class="ico file"></span>robots.txt</td><td class="num dim">68 bytes</td><td class="dim">2 Sep 2026</td><td class="dim">rw-r--r--</td></tr></table>
+<div style=flex:1></div><div class=foot><span>8 items · 222 KB</span>
+<span class=transfer>Uploading app.js<span class=bar><i></i></span>2.1 MB/s</span></div></section>
+</div></div></div></body></html>
