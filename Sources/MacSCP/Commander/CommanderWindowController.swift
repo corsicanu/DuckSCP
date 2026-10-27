@@ -180,6 +180,10 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         tab.local.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
         tab.remote.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
         transfers.attach(tab)
+        let policy = { ReconnectPolicy(currentPrefs) }
+        session.reconnectPolicy = policy
+        tab.queue.reconnectPolicy = policy
+        session.onStatus = { [weak self] text in self?.flashStatus(text) }
         tabs.append(tab)
         select(tab)
     }
@@ -465,9 +469,18 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         window?.title = "\(RemotePath.name(tab.remote.path).isEmpty ? "/" : RemotePath.name(tab.remote.path)) - \(tab.session.site.displayTarget) - \(Branding.appName)"
     }
 
+    /// Shows a transient message (e.g. reconnecting) in the status bar.
+    func flashStatus(_ text: String) {
+        statusMessage = text
+        statusMessageUntil = Date().addingTimeInterval(5)
+        updateStatusBar()
+    }
+    private var statusMessage = ""
+    private var statusMessageUntil = Date.distantPast
+
     func updateStatusBar() {
         guard let tab = current else { return }
-        statusBytes.stringValue = transfers.statusText
+        statusBytes.stringValue = Date() < statusMessageUntil ? statusMessage : transfers.statusText
         statusProtocol.stringValue = "🔒 \(tab.session.fs.protocolName)"
         statusTime.stringValue = Format.duration(Date().timeIntervalSince(tab.session.connectedAt))
     }

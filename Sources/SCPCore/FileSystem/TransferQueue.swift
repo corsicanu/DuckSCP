@@ -31,6 +31,7 @@ public final class TransferQueue {
         public internal(set) var startedAt: Date?
         public internal(set) var finishedAt: Date?
         var cancelRequested = false
+        var reconnects = 0
 
         public init(upload urls: [URL], to targetDir: String, move: Bool = false, options: TransferEngine.Options = .init()) {
             direction = .upload
@@ -74,6 +75,7 @@ public final class TransferQueue {
     public var ask: (TransferEngine.Conflict) -> TransferEngine.Decision = { _ in .skip }
 
     private let connect: () throws -> RemoteFileSystem
+    public var reconnectPolicy: () -> ReconnectPolicy = { ReconnectPolicy() }
     private var fs: RemoteFileSystem?
     private let worker = DispatchQueue(label: "transfer.queue", qos: .utility)
     private let lock = NSLock()
@@ -159,11 +161,19 @@ public final class TransferQueue {
             set(item, .done)
         } catch let e as FileSystemError where e.code == .cancelled {
             set(item, .cancelled)
-        } catch {
-            if (error as? FileSystemError)?.code == .connection {
-                fs?.close()
-                fs = nil // reconnect for the next item
+        } catch let e as FileSystemError where e.code == .connection && !item.cancelRequested
+                    && item.reconnects < reconnectPolicy().attempts {
+            item.reconnects += 1
+            fs?.close()
+            fs = nil
+            // Reconnect and retry the item; .filepart resume continues where it stopped.
+            if let fresh = reconnectPolicy().reconnect(connect, status: { _ in set(item, .connecting) }) {
+                fs = fresh
+                lock.withLock { item.state = .pending }
+                return process(item)
             }
+            set(item, .failed(String(describing: e)))
+        } catch {
             set(item, .failed(String(describing: error)))
         }
     }

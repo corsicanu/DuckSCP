@@ -98,6 +98,8 @@ The app follows macOS light/dark mode by default and switches live. Preferences 
 
 On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag files between panels or in from Finder.
 
+**Lost connections** reconnect automatically: up to 3 attempts, 5 s apart, configurable under Preferences → Endurance. The interrupted operation then runs again. Queued transfers resume from their `.filepart`. The status bar shows reconnect progress.
+
 **Background transfers:** tick *Transfer in background* in the Copy/Move dialog. The item goes to the queue under the panels (toolbar **Queue** shows or hides it). Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
 
 Transfers over 100 KB go through a `.filepart` temp file and are renamed when complete. An interrupted download resumes from the `.filepart` on the next attempt.
@@ -134,7 +136,6 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 - **Not yet built:** WebDAV, S3, workspaces, Synchronize, Keep Remote Directory Up to Date, Find Files, Explorer-style interface, Preferences dialog.
 - **Master password.** If the ini uses a WinSCP master password, its passwords cannot be imported.
-- **Lost connections.** There is no automatic reconnect. Use Disconnect, then log in again.
 - **FTPS.** An accepted untrusted certificate is not pinned; you are asked again on every connect.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).
 
