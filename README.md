@@ -125,7 +125,7 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - **Authentication order:** private key from the site settings, then ssh-agent, then keyboard-interactive and password. You are prompted if no password is stored.
 - **Keys:** OpenSSH and PEM keys, encrypted or not. PuTTY `.ppk` v2 and v3 unencrypted, and v2 encrypted. Encrypted v3 `.ppk` files use Argon2; convert those with PuTTYgen → Conversions → Export OpenSSH key.
 - **SCP mode** runs `ls`, `mv`, `rm`, `chmod` and `touch` on the server, so it needs a POSIX shell, like WinSCP's SCP mode. Listings use `TZ=UTC` and the most precise date format the server's `ls` supports.
-- **FTP/FTPS** uses the system libcurl with macOS's trust store. Listings use MLSD, then fall back to `LIST -a` and `LIST` (Unix and Windows/IIS formats). Untrusted certificates ask *Connect Anyway / Cancel*; the answer lasts for that session only and is never saved.
+- **FTP/FTPS** uses the system libcurl with macOS's trust store. Listings use MLSD, then fall back to `LIST -a` and `LIST` (Unix and Windows/IIS formats). A certificate macOS doesn't trust (self-signed, for example) is first fetched with an anonymous probe, so your password is never sent to an unverified server. You then see its SHA-256 fingerprint and choose *Accept and Remember*, *Connect Once* or *Cancel*. An accepted certificate's public key is pinned (`CURLOPT_PINNEDPUBLICKEY`), so a different certificate later triggers the "POTENTIAL SECURITY BREACH" warning.
 - **Host keys** are checked against MacSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
 
 ## Large directories
@@ -151,7 +151,6 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 - **Not yet built:** WebDAV, S3.
 - **Master password** decryption follows WinSCP's AES format (WinZip-AES / fcrypt). It is verified against an independent Python implementation, not yet against a file from WinSCP itself. Every password is MAC-checked, so it either decrypts correctly or is reported as failed.
-- **FTPS.** An accepted untrusted certificate is not pinned; you are asked again on every connect.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).
 
 ## Developer notes

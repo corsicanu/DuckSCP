@@ -8,40 +8,58 @@ public final class FTPFileSystem: RemoteFileSystem {
     private let site: Site
     private let user: String
     private let password: String
-    private var verifyPeer = true
     /// libcurl keeps this pointer, so it must not move: allocated once, freed in deinit.
     private let errorBuffer = UnsafeMutablePointer<CChar>.allocate(capacity: Int(CURL_ERROR_SIZE) + 1)
     private var listCommand = "MLSD"
+    /// When set, TLS is checked by this public-key pin instead of the system trust store.
+    var pin: String?
     var settings = ConnectionSettings()
 
     private static let initOnce: Void = { curl_global_init(Int(CURL_GLOBAL_DEFAULT)) }()
 
     /// Connects and logs in, asking for a password (and about untrusted TLS certificates) as needed.
+    /// TLS trust: system trust store first; otherwise the user may accept the certificate,
+    /// whose public key is then pinned (CURLOPT_PINNEDPUBLICKEY) for this and, when saved,
+    /// later sessions. The certificate is fetched with an anonymous probe, so the real
+    /// password never goes to an unverified server.
     public static func connect(site: Site, password: String?, prompter: ConnectionPrompter,
-                               settings: ConnectionSettings = .init()) throws -> FTPFileSystem {
+                               settings: ConnectionSettings = .init(), hostKeys: HostKeyStore? = nil) throws -> FTPFileSystem {
         _ = initOnce
         var current = password
         let user = site.userName.isEmpty ? "anonymous" : site.userName
         if current == nil, user == "anonymous" { current = "anonymous@" }
-        var verify = true
-        for attempt in 0..<4 {
+        let tls = site.ftpEncryption != .none
+        var pin = tls ? hostKeys?.certificate(host: site.hostName, port: site.port).flatMap(Certificate.pin) : nil
+        var askedCertificate = false
+        for attempt in 0..<5 {
             if current == nil {
                 guard let p = prompter.askPassword(attempt == 0 ? "Password:" : "Access denied. Password:") else { throw FileSystemError.cancelled }
                 current = p
             }
             prompter.status("Connecting to \(site.hostName)...")
             let fs = try FTPFileSystem(site: site, user: user, password: current ?? "")
-            fs.verifyPeer = verify
+            fs.pin = pin
             fs.settings = settings
             do {
                 _ = try fs.homeDirectory()
                 prompter.status("Connected.")
                 return fs
-            } catch let e as FileSystemError where e.code == .hostKey && verify {
-                guard prompter.confirmUntrustedCertificate(host: site.hostName, message: e.message) else {
-                    throw FileSystemError(.hostKey, "Certificate was not accepted.")
+            } catch let e as FileSystemError where e.code == .hostKey && !askedCertificate {
+                askedCertificate = true
+                let probe = try FTPFileSystem(site: site, user: "anonymous", password: "probe@")
+                probe.settings = settings
+                guard let der = probe.probeCertificate(), let newPin = Certificate.pin(der) else {
+                    throw FileSystemError(.hostKey, "\(e.message) (the certificate could not be read)")
                 }
-                verify = false // this session only; never saved
+                let decision = prompter.verifyCertificate(host: site.hostName, port: site.port,
+                                                          fingerprint: Certificate.fingerprint(der), problem: e.message,
+                                                          changed: pin != nil)
+                switch decision {
+                case .reject: throw FileSystemError(.hostKey, "Certificate was not accepted.")
+                case .acceptAndSave: try? hostKeys?.save(host: site.hostName, port: site.port, key: HostKey(type: "x509", blob: der))
+                case .acceptOnce: break
+                }
+                pin = newPin
             } catch let e as FileSystemError where e.code == .authentication {
                 current = nil
                 if attempt == 3 { throw e }
@@ -113,8 +131,14 @@ public final class FTPFileSystem: RemoteFileSystem {
         if site.ftpEncryption == .explicitTLS {
             macscp_curl_long(curl, CURLOPT_USE_SSL, Int(CURLUSESSL_ALL.rawValue))
         }
-        macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, verifyPeer ? 1 : 0)
-        macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, verifyPeer ? 2 : 0)
+        if let pin {
+            macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
+            macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
+            macscp_curl_str(curl, CURLOPT_PINNEDPUBLICKEY, pin)
+        } else {
+            macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 1)
+            macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 2)
+        }
         if !site.ftpPassive { macscp_curl_str(curl, CURLOPT_FTPPORT, "-") }
         errorBuffer[0] = 0
     }
@@ -132,6 +156,8 @@ public final class FTPFileSystem: RemoteFileSystem {
         case CURLE_COULDNT_RESOLVE_HOST: throw FileSystemError(.connection, "Host \"\(site.hostName)\" does not exist.")
         case CURLE_COULDNT_CONNECT, CURLE_OPERATION_TIMEDOUT, CURLE_SEND_ERROR, CURLE_RECV_ERROR, CURLE_FTP_ACCEPT_TIMEOUT:
             throw FileSystemError(.connection, "Network error: \(detail)")
+        case CURLE_SSL_PINNEDPUBKEYNOTMATCH:
+            throw FileSystemError(.hostKey, "The server's certificate has CHANGED since you accepted it. This could be an attack.")
         case CURLE_PEER_FAILED_VERIFICATION, CURLE_SSL_CACERT_BADFILE:
             throw FileSystemError(.hostKey, "The server's TLS certificate is not trusted: \(detail)")
         case CURLE_SSL_CONNECT_ERROR where detail.lowercased().contains("certificate"):
@@ -199,6 +225,19 @@ public final class FTPFileSystem: RemoteFileSystem {
         let ptr = Unmanaged.passRetained(sink).toOpaque()
         defer { Unmanaged<Sink>.fromOpaque(ptr).release() }
         return try body(ptr)
+    }
+
+    /// Fetches the server certificate without trusting it and without real credentials.
+    func probeCertificate() -> Data? {
+        reset(baseURL + "/")
+        macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
+        macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
+        macscp_curl_long(curl, CURLOPT_CERTINFO, 1)
+        macscp_curl_long(curl, CURLOPT_NOBODY, 1)
+        _ = curl_easy_perform(curl) // login may fail; the TLS handshake has happened by then
+        var buf = [CChar](repeating: 0, count: 256 * 1024)
+        guard macscp_curl_first_cert(curl, &buf, buf.count) > 0 else { return nil }
+        return Certificate.firstDER(fromPEM: String(cString: buf))
     }
 
     // MARK: RemoteFileSystem

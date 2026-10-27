@@ -122,18 +122,25 @@ final class ConnectingWindow: NSWindowController, ConnectionPrompter {
         }
     }
 
-    func confirmUntrustedCertificate(host: String, message: String) -> Bool {
-        let ok: Bool = onMain {
+    func verifyCertificate(host: String, port: Int, fingerprint: String, problem: String, changed: Bool) -> HostKeyDecision {
+        let decision: HostKeyDecision = onMain {
             let a = NSAlert()
             a.alertStyle = .critical
-            a.messageText = "The server's certificate is not trusted."
-            a.informativeText = "\(message)\n\nConnecting anyway means the connection to \(host) could be intercepted. This choice applies to this session only."
+            a.messageText = changed ? "WARNING - POTENTIAL SECURITY BREACH!" : "The server's certificate is not trusted."
+            let reason = changed ? "The certificate of \(host):\(port) differs from the one you accepted before." : problem
+            a.informativeText = reason + "\n\nSHA-256 fingerprint:\n" + fingerprint
+                + "\n\nCompare it with the one your server administrator gave you. Accepting pins this certificate's key, so a different certificate is reported next time."
             a.addButton(withTitle: "Cancel")
-            a.addButton(withTitle: "Connect Anyway")
-            return a.runModal() == .alertSecondButtonReturn
+            a.addButton(withTitle: "Accept and Remember")
+            a.addButton(withTitle: "Connect Once")
+            switch a.runModal() {
+            case .alertSecondButtonReturn: return .acceptAndSave
+            case .alertThirdButtonReturn: return .acceptOnce
+            default: return .reject
+            }
         }
-        if ok { cached.acceptedUntrustedCertificate = true }
-        return ok
+        if decision != .reject { cached.acceptedCertificate = fingerprint }
+        return decision
     }
 
     func askPassword(_ prompt: String) -> String? {

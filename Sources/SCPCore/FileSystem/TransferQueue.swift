@@ -193,7 +193,7 @@ public final class CachedPrompter: ConnectionPrompter {
     public var password: String?
     public var passphrases: [String: String] = [:]
     public var acceptedHostKey: HostKey?
-    public var acceptedUntrustedCertificate = false
+    public var acceptedCertificate: String?
 
     public init() {}
 
@@ -205,6 +205,8 @@ public final class CachedPrompter: ConnectionPrompter {
     }
 
     public func askPassword(_ prompt: String) -> String? { password }
-    public func confirmUntrustedCertificate(host: String, message: String) -> Bool { acceptedUntrustedCertificate }
+    public func verifyCertificate(host: String, port: Int, fingerprint: String, problem: String, changed: Bool) -> HostKeyDecision {
+        fingerprint == acceptedCertificate ? .acceptOnce : .reject
+    }
     public func askPassphrase(keyPath: String) -> String? { passphrases[keyPath] }
 }

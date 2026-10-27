@@ -26,10 +26,13 @@ final class TestPrompter: ConnectionPrompter {
     func askPassphrase(keyPath: String) -> String? { passphraseAsked += 1; return passphrase }
 
     var acceptCertificate = false
+    var saveCertificate = false
     var certificateAsked = 0
-    func confirmUntrustedCertificate(host: String, message: String) -> Bool {
+    var certificateChanged: [Bool] = []
+    func verifyCertificate(host: String, port: Int, fingerprint: String, problem: String, changed: Bool) -> HostKeyDecision {
         certificateAsked += 1
-        return acceptCertificate
+        certificateChanged.append(changed)
+        return acceptCertificate ? (saveCertificate ? .acceptAndSave : .acceptOnce) : .reject
     }
 }
 

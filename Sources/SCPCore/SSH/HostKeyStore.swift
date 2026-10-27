@@ -81,6 +81,11 @@ public final class HostKeyStore {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
     }
 
+    /// FTPS certificate accepted earlier for this host (DER), if any.
+    public func certificate(host: String, port: Int) -> Data? {
+        lock.withLock { keys[Self.hostID(host, port)]?.first { $0.type == "x509" }?.blob }
+    }
+
     /// Forgets every cached key (does not touch ~/.ssh/known_hosts).
     public func clearAll() throws {
         lock.withLock { keys.removeAll() }

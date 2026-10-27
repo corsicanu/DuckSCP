@@ -16,5 +16,7 @@ CURLcode macscp_curl_read_cb(CURL *h, macscp_io_cb cb, void *userdata);
 CURLcode macscp_curl_progress_cb(CURL *h, macscp_progress_cb cb, void *userdata);
 CURLcode macscp_curl_info_str(CURL *h, CURLINFO i, const char **out);
 CURLcode macscp_curl_info_long(CURL *h, CURLINFO i, long *out);
+/// Copies CERTINFO of the first (server) certificate as "Key:value" lines. Returns bytes written.
+size_t macscp_curl_first_cert(CURL *h, char *out, size_t len);
 
 #endif
