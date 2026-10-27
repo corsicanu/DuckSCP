@@ -15,7 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let dataDir {
             store = SiteStore(fileURL: URL(fileURLWithPath: dataDir).appendingPathComponent("sites.json"), secrets: InMemorySecretStore())
         } else if snapshotDir != nil {
-            NSApp.appearance = NSAppearance(named: .aqua) // PDF snapshots draw no window background
             let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             store = SiteStore(fileURL: tmp.appendingPathComponent("sites.json"), secrets: InMemorySecretStore())
         } else {
@@ -23,12 +22,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                               secrets: KeychainSecretStore(service: Branding.bundleID + ".sites"))
         }
 
+        if snapshotDir != nil { NSApp.appearance = NSAppearance(named: .aqua) } // PDF snapshots draw no window background
+        let support = SiteStore.defaultURL(appName: Branding.appName).deletingLastPathComponent()
+        hostKeys = HostKeyStore(fileURL: dataDir.map { URL(fileURLWithPath: $0).appendingPathComponent("host_keys.json") }
+                                ?? support.appendingPathComponent("host_keys.json"))
         NSApp.mainMenu = MainMenu.build()
         showLogin()
         if let ini = value(after: "--import", in: args) {
             loginWindow?.importIni(at: URL(fileURLWithPath: ini))
         }
         NSApp.activate(ignoringOtherApps: true)
+
+        // Like `winscp.exe "Site name"`: open a stored site straight away.
+        if let name = value(after: "--open", in: args) {
+            if let site = store.sites.first(where: { $0.path == name }) {
+                openSession(site, password: site.hasStoredPassword ? store.secrets.password(for: site.id) : nil)
+            } else {
+                showError(FileSystemError(.notFound, "No site named \"\(name)\"."), in: nil)
+            }
+        }
 
         if args.contains("--demo-commander") {
             // Development aid: a Commander tab whose "remote" side is the local disk.
@@ -37,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let snapshotDir {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 Snapshot.run(to: URL(fileURLWithPath: snapshotDir), app: self)
             }
         }
@@ -66,17 +78,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showLogin() {
         if loginWindow == nil {
-            let lw = LoginWindowController(store: store)
+            let lw = LoginWindowController(store: store, hostKeys: hostKeys)
             lw.onLogin = { [weak self] site, password in self?.openSession(site, password: password) }
             loginWindow = lw
         }
         loginWindow?.showWindow(nil)
     }
 
+    private(set) var hostKeys: HostKeyStore!
+    private var connecting: [ConnectingWindow] = []
+
+    /// Connects in the background behind WinSCP's progress dialog, then opens a tab.
     func openSession(_ site: Site, password: String?) {
-        let alert = NSAlert()
-        alert.messageText = "Connecting to \(site.displayTarget) arrives in a later phase."
-        alert.runModal()
+        let dialog = ConnectingWindow(site: site)
+        connecting.append(dialog)
+        dialog.showWindow(nil)
+        let hostKeys = self.hostKeys!
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result<RemoteSession, Error> {
+                let fs = try Connector.connect(site: site, password: password, prompter: dialog, hostKeys: hostKeys)
+                if dialog.isCancelled { fs.close(); throw FileSystemError.cancelled }
+                return RemoteSession(site: site, fs: fs)
+            }
+            DispatchQueue.main.async { [self] in
+                dialog.close()
+                connecting.removeAll { $0 === dialog }
+                switch result {
+                case .success(let session):
+                    attach(session)
+                case .failure(let error):
+                    if (error as? FileSystemError)?.code == .cancelled { return }
+                    let a = NSAlert()
+                    a.alertStyle = .critical
+                    a.messageText = "Cannot connect to \(site.displayTarget)"
+                    a.informativeText = String(describing: error)
+                    a.runModal()
+                    showLogin()
+                }
+            }
+        }
     }
 
     /// Adds a connected session as a tab, creating the Commander window on first use.

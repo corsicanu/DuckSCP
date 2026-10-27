@@ -86,7 +86,13 @@ public protocol RemoteFileSystem: AnyObject {
     func upload(_ local: URL, to path: String, offset: UInt64, progress: (UInt64) -> Bool) throws
     /// Whether `offset` > 0 is honoured (resume support).
     var supportsResume: Bool { get }
+    /// Keeps idle connections open. Called periodically on the session queue.
+    func keepalive()
     func close()
+}
+
+public extension RemoteFileSystem {
+    func keepalive() {}
 }
 
 /// POSIX path helpers for remote paths (always "/" separated).

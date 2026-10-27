@@ -12,13 +12,13 @@ It imports your existing `WinSCP.ini` sites, including saved passwords.
 |---|---|---|
 | 1 | Login / Site Manager, WinSCP.ini import, Keychain passwords | ✅ |
 | 2 | Commander window: session tabs, local/remote panels, F-key commands, transfer engine | ✅ |
-| 3 | SFTP / SCP (libssh2), host-key checks, keys | ⏳ |
+| 3 | SFTP / SCP (libssh2): host-key checks, passwords, OpenSSH + PuTTY keys, ssh-agent | ✅ |
 | 4 | Transfer queue, progress, resume | ⏳ |
 | 5 | FTP / FTPS (libcurl) | ⏳ |
 
 ## Build and run
 
-Needs macOS 13+, Swift 5.9+ (Command Line Tools are enough, Xcode is optional) and Homebrew `libssh2` from phase 3 on.
+Needs macOS 13+, Swift 5.9+ (Command Line Tools are enough, Xcode is optional) and Homebrew `libssh2` + `openssl@4`. They are linked statically, so the built app runs on Macs without Homebrew.
 
 ```bash
 scripts/build_app.sh --install
@@ -30,7 +30,13 @@ This builds `build/MacSCP.app`, signs it ad hoc and copies it to `~/Applications
 scripts/test.sh
 ```
 
-Runs the unit tests.
+Runs the unit tests. For the SSH integration tests, first start a throwaway local SSH server (key login only, `127.0.0.1:2222`):
+
+```bash
+scripts/test_sshd.sh start
+```
+
+Without it, those tests are skipped.
 
 ## Importing WinSCP.ini
 
@@ -66,10 +72,22 @@ On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag f
 
 Transfers over 100 KB go through a `.filepart` temp file and are renamed when complete. An interrupted download resumes from the `.filepart` on the next attempt.
 
+## Connecting
+
+- **Command line:** `MacSCP --open "Folder/Site name"` opens a stored site, like `winscp.exe "Site name"`.
+- **Authentication order:** private key from the site settings, then ssh-agent, then keyboard-interactive and password. You are prompted if no password is stored.
+- **Keys:** OpenSSH and PEM keys, encrypted or not. PuTTY `.ppk` v2 and v3 unencrypted, and v2 encrypted. Encrypted v3 `.ppk` files use Argon2; convert those with PuTTYgen → Conversions → Export OpenSSH key.
+- **SCP mode** runs `ls`, `mv`, `rm`, `chmod` and `touch` on the server, so it needs a POSIX shell, like WinSCP's SCP mode. Listings use `TZ=UTC` and the most precise date format the server's `ls` supports.
+- **Host keys** are checked against MacSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
+
 ## Security
 
 - Passwords are stored in the macOS Keychain (`WhenUnlockedThisDeviceOnly`, no iCloud sync). They are never written to disk.
 - Site settings live in `~/Library/Application Support/MacSCP/sites.json`, with folder mode `0700` and file mode `0600`.
+- Host keys are cached in `host_keys.json` next to `sites.json`, mode `0600`.
+- File names received from servers are validated before anything is written locally, so `../` and `/` cannot escape the target folder.
+- New local files are created with `O_NOFOLLOW`, so a planted symlink is never followed.
+- SCP shell arguments are always single-quoted.
 - The app is signed with the hardened runtime.
 
 ## Developer notes

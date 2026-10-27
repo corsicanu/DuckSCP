@@ -12,6 +12,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     }
 
     let store: SiteStore
+    let hostKeys: HostKeyStore
     /// Called with the edited (possibly unsaved) site and the password to use.
     var onLogin: ((Site, String?) -> Void)?
 
@@ -30,8 +31,9 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     private let warningLabel = label("")
     private let saveButton = MenuButton(title: "Save", menu: NSMenu())
 
-    init(store: SiteStore) {
+    init(store: SiteStore, hostKeys: HostKeyStore) {
         self.store = store
+        self.hostKeys = hostKeys
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 440),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Login - \(Branding.appName)"
@@ -498,6 +500,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         do {
             let result = try WinSCPIniImporter().importFile(at: url)
             let count = try store.merge(result)
+            let keyCount = hostKeys.importWinSCP(result.hostKeys)
             reloadTree(select: result.sites.first?.id)
             let alert = NSAlert()
             alert.messageText = "Imported \(count) site\(count == 1 ? "" : "s") from \(url.lastPathComponent)"
@@ -506,6 +509,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             if !warned.isEmpty {
                 info.append("\(warned.count) site(s) need attention (marked ⚠︎): " + warned.map(\.path).joined(separator: ", "))
             }
+            if keyCount > 0 { info.append("Imported \(keyCount) cached host key(s).") }
             info.append("Passwords were moved into the macOS Keychain. Consider deleting the .ini file; its passwords are only obfuscated, not encrypted.")
             alert.informativeText = info.joined(separator: "\n\n")
             alert.beginSheetModal(for: window!)

@@ -77,6 +77,29 @@ public struct Site: Codable, Equatable, Identifiable {
         self.port = port ?? Site.defaultPort(fileProtocol, ftpEncryption)
     }
 
+    /// Tolerant decoding: fields added in later versions fall back to defaults.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let proto = try c.decodeIfPresent(FileProtocol.self, forKey: .fileProtocol) ?? .sftp
+        let enc = try c.decodeIfPresent(FtpEncryption.self, forKey: .ftpEncryption) ?? .none
+        self.init(id: try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID(),
+                  path: try c.decode(String.self, forKey: .path),
+                  fileProtocol: proto,
+                  allowScpFallback: try c.decodeIfPresent(Bool.self, forKey: .allowScpFallback) ?? true,
+                  ftpEncryption: enc,
+                  ftpPassive: try c.decodeIfPresent(Bool.self, forKey: .ftpPassive) ?? true,
+                  hostName: try c.decodeIfPresent(String.self, forKey: .hostName) ?? "",
+                  port: try c.decodeIfPresent(Int.self, forKey: .port),
+                  userName: try c.decodeIfPresent(String.self, forKey: .userName) ?? "",
+                  privateKeyPath: try c.decodeIfPresent(String.self, forKey: .privateKeyPath) ?? "",
+                  remoteDirectory: try c.decodeIfPresent(String.self, forKey: .remoteDirectory) ?? "",
+                  localDirectory: try c.decodeIfPresent(String.self, forKey: .localDirectory) ?? "",
+                  note: try c.decodeIfPresent(String.self, forKey: .note) ?? "",
+                  color: try c.decodeIfPresent(Int.self, forKey: .color),
+                  hasStoredPassword: try c.decodeIfPresent(Bool.self, forKey: .hasStoredPassword) ?? false,
+                  importWarnings: try c.decodeIfPresent([String].self, forKey: .importWarnings) ?? [])
+    }
+
     public static func defaultPort(_ p: FileProtocol, _ enc: FtpEncryption) -> Int {
         switch p {
         case .sftp, .scp: return 22

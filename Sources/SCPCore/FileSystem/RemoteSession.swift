@@ -14,7 +14,14 @@ public final class RemoteSession {
         self.fs = fs
         queue = DispatchQueue(label: "session.\(site.hostName)", qos: .userInitiated)
         homeDirectory = (try? fs.homeDirectory()) ?? "/"
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + 30, repeating: 30)
+        timer.setEventHandler { [weak fs] in fs?.keepalive() }
+        timer.resume()
+        keepaliveTimer = timer
     }
+
+    private var keepaliveTimer: DispatchSourceTimer?
 
     public func perform<T>(_ work: @escaping (RemoteFileSystem) throws -> T,
                            completion: @escaping (Result<T, Error>) -> Void) {
@@ -30,6 +37,7 @@ public final class RemoteSession {
     }
 
     public func close() {
+        keepaliveTimer?.cancel()
         queue.async { [fs] in fs.close() }
     }
 }
