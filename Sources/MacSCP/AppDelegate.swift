@@ -4,6 +4,7 @@ import SCPCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var store: SiteStore!
     private var loginWindow: LoginWindowController?
+    private(set) var commander: CommanderWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
@@ -29,6 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
 
+        if args.contains("--demo-commander") {
+            // Development aid: a Commander tab whose "remote" side is the local disk.
+            let site = Site(path: "Demo", hostName: "localhost", userName: NSUserName())
+            attach(RemoteSession(site: site, fs: LocalFileSystem()))
+        }
+
         if let snapshotDir {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 Snapshot.run(to: URL(fileURLWithPath: snapshotDir), app: self)
@@ -37,6 +44,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        commander?.transfers.stopEditing()
+    }
+
+    // Files menu: forwards to the Commander's active panel.
+    @objc func filesCommand(_ sender: NSMenuItem) {
+        guard let c = commander else { return NSSound.beep() }
+        switch sender.tag {
+        case 2: c.cmdRename()
+        case 4: c.cmdEdit()
+        case 5: c.cmdCopy()
+        case 6: c.cmdMove()
+        case 7: c.cmdMakeDir()
+        case 8: c.cmdDelete()
+        case 9: c.cmdProperties()
+        default: break
+        }
+    }
 
     @objc func showLogin() {
         if loginWindow == nil {
@@ -51,6 +77,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.messageText = "Connecting to \(site.displayTarget) arrives in a later phase."
         alert.runModal()
+    }
+
+    /// Adds a connected session as a tab, creating the Commander window on first use.
+    func attach(_ session: RemoteSession) {
+        if commander == nil {
+            let c = CommanderWindowController()
+            c.onNewSession = { [weak self] in self?.showLogin() }
+            commander = c
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: c.window, queue: .main) { [weak self] _ in
+                self?.commander = nil
+            }
+        }
+        commander?.add(session: session)
+        commander?.showWindow(nil)
+        loginWindow?.window?.orderOut(nil)
     }
 
     var loginController: LoginWindowController? { loginWindow }

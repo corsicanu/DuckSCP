@@ -14,7 +14,21 @@ enum MainMenu {
 
         let session = NSMenu(title: "Session")
         session.add("New Session…", #selector(AppDelegate.showLogin), "n")
+        session.add("Disconnect", #selector(CommanderWindowController.disconnect), "")
+        session.add("Refresh", #selector(CommanderWindowController.refreshAll), "r")
         main.addItem(submenu: session, title: "Session")
+
+        let files = NSMenu(title: "Files")
+        let fkeys: [(String, Int, Int)] = [
+            ("Rename", 2, NSF2FunctionKey), ("Edit", 4, NSF4FunctionKey), ("Copy…", 5, NSF5FunctionKey),
+            ("Move…", 6, NSF6FunctionKey), ("Create Directory…", 7, NSF7FunctionKey), ("Delete", 8, NSF8FunctionKey),
+            ("Properties", 9, NSF9FunctionKey),
+        ]
+        for (title, tag, key) in fkeys {
+            let item = files.add(title, #selector(AppDelegate.filesCommand(_:)), String(Character(UnicodeScalar(key)!)), modifiers: [])
+            item.tag = tag
+        }
+        main.addItem(submenu: files, title: "Files")
 
         let edit = NSMenu(title: "Edit")
         edit.add("Cut", #selector(NSText.cut(_:)), "x")
