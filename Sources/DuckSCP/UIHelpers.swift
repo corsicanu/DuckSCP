@@ -51,12 +51,26 @@ extension NSMenu {
     }
 }
 
+/// Reports itself active while screenshots force the active appearance (see SnapshotWindow).
+final class DuckApplication: NSApplication {
+    override var isActive: Bool { SnapshotWindow.forceActiveAppearance || super.isActive }
+}
+
+/// Window that can draw its active (key) appearance while screenshots are taken from a
+/// background process, which macOS no longer lets take focus. Off outside --snapshot.
+class SnapshotWindow: NSWindow {
+    static var forceActiveAppearance = false
+    override var isKeyWindow: Bool { Self.forceActiveAppearance || super.isKeyWindow }
+    override var isMainWindow: Bool { Self.forceActiveAppearance || super.isMainWindow }
+}
+
 extension NSWindow {
     /// Renders the content view into a PNG; used by --snapshot for headless UI checks.
     func writeSnapshot(to url: URL) {
         // PDF drawing renders controls faithfully even off screen, but skips the window
         // background, so paint that first in the window's own (light or dark) appearance.
-        guard let view = contentView, let pdf = NSImage(data: view.dataWithPDF(inside: view.bounds)) else { return }
+        // The frame view includes the title bar and toolbar, not just the content.
+        guard let view = contentView?.superview ?? contentView, let pdf = NSImage(data: view.dataWithPDF(inside: view.bounds)) else { return }
         let image = NSImage(size: view.bounds.size)
         image.lockFocus()
         view.effectiveAppearance.performAsCurrentDrawingAppearance {

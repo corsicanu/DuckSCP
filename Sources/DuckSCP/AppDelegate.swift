@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         prefs = PreferencesStore(fileURL: dataDir.map { URL(fileURLWithPath: $0).appendingPathComponent("preferences.json") }
                                  ?? support.appendingPathComponent("preferences.json"))
         applyTheme()
+        Theme.startObserving()
         if let forced = value(after: "--appearance", in: args) { // snapshot testing
             NSApp.appearance = NSAppearance(named: forced == "dark" ? .darkAqua : .aqua)
         }
@@ -52,6 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 showError(FileSystemError(.notFound, "No site named \"\(name)\"."), in: nil)
             }
         }
+
+        if args.contains("--demo-screenshot") { DemoScene.build(app: self) }
 
         if args.contains("--demo-commander") {
             // Development aid: a Commander tab whose "remote" side is the local disk.
@@ -79,13 +82,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        if let path = value(after: "--select-site", in: args), let site = store.sites.first(where: { $0.path == path }) {
+            loginWindow?.reloadTree(select: site.id)
+        }
+
         if args.contains("--show-preferences") {
+            if isSnapshotMode { loginWindow?.window?.orderOut(nil) } // one window per screenshot
             showPreferences()
             if let tab = value(after: "--show-preferences", in: args), let i = Int(tab) { preferencesWindow?.selectTab(i) }
         }
 
         if let snapshotDir {
             let delay = value(after: "--snapshot-delay", in: args).flatMap(Double.init) ?? 3
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay - 0.3) {
+                // Screenshots should show the window as active (key window, accent selection).
+                NSApp.activate(ignoringOtherApps: true)
+                SnapshotWindow.forceActiveAppearance = true
+                NSApp.windows.forEach { $0.contentView?.superview?.needsDisplay = true; $0.contentView?.needsDisplay = true }
+                self.commander?.tabs.forEach { $0.local.refreshSelectionLook(); $0.remote.refreshSelectionLook() }
+                (self.commander?.window ?? NSApp.windows.first { $0.isVisible })?.makeKeyAndOrderFront(nil)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 Snapshot.run(to: URL(fileURLWithPath: snapshotDir), app: self)
             }
@@ -125,6 +141,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private(set) var hostKeys: HostKeyStore!
     private(set) var prefs: PreferencesStore!
+    /// --snapshot runs must never block on a dialog.
+    var isSnapshotMode: Bool { CommandLine.arguments.contains("--snapshot") }
 
     static var defaultLogURL: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/\(Branding.appName)/session.log")
@@ -164,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard prefs.current.confirmExitWithTransfers, commander?.tabs.contains(where: { $0.queue.hasActiveItems }) == true else {
+        guard !isSnapshotMode, prefs.current.confirmExitWithTransfers, commander?.tabs.contains(where: { $0.queue.hasActiveItems }) == true else {
             return .terminateNow
         }
         let a = NSAlert()
@@ -267,7 +285,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Adds a connected session as a tab, creating the Commander window on first use.
-    func attach(_ session: RemoteSession) {
+    func attach(_ session: RemoteSession, localBackend: PanelBackend = LocalBackend()) {
         if commander == nil {
             let c = CommanderWindowController()
             c.onNewSession = { [weak self] in self?.showLogin() }
@@ -276,7 +294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.commander = nil
             }
         }
-        commander?.add(session: session)
+        commander?.add(session: session, localBackend: localBackend)
         commander?.showWindow(nil)
         loginWindow?.window?.orderOut(nil)
     }

@@ -40,6 +40,7 @@ protocol FilePanelDelegate: AnyObject {
     func panel(_ panel: FilePanel, command: PanelCommand)
     func panelPathDidChange(_ panel: FilePanel)
     func panel(_ panel: FilePanel, didFail error: Error)
+    func panelSummaryDidChange(_ panel: FilePanel)
 }
 
 enum PanelCommand { case copy, move, delete, rename, makeDirectory, properties, edit, open, switchPanel }
@@ -79,9 +80,10 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     private var hasLoaded = false
 
     private let table = PanelTableView()
-    private let pathPopup = NSPopUpButton()
-    private let statusLabel = label("")
-    private var headerBar = HighlightStackView()
+    private let breadcrumb = BreadcrumbBar()
+    private let edge = AccentEdge()
+    /// "2 of 7 selected · 226 KB", shown in the window's status bar for the active panel.
+    private(set) var summary = ""
     private let columns: [PanelColumn]
 
     static let parentName = ".."
@@ -100,27 +102,27 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     override func loadView() {
         let root = NSView()
 
-        pathPopup.target = self
-        pathPopup.action = #selector(pathPicked)
-        pathPopup.translatesAutoresizingMaskIntoConstraints = false
-        pathPopup.controlSize = .small
-
         let nav = NSStackView(views: [
             toolButton("chevron.left", "Back", #selector(goBack)),
             toolButton("chevron.right", "Forward", #selector(goForward)),
-            toolButton("arrow.turn.left.up", "Parent directory", #selector(goParent)),
-            toolButton("externaldrive", "Root directory", #selector(goRoot)),
-            toolButton("house", "Home directory", #selector(goHome)),
+            toolButton("arrow.up", "Parent folder", #selector(goParent)),
+        ])
+        nav.spacing = 0
+        breadcrumb.onNavigate = { [weak self] p in self?.load(p) }
+        breadcrumb.onEdit = { [weak self] in self?.goToFolder() }
+        breadcrumb.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        let trailing = NSStackView(views: [
+            toolButton("house", "Home folder", #selector(goHome)),
             toolButton("arrow.clockwise", "Refresh", #selector(refresh)),
         ])
-        nav.spacing = 2
-        headerBar = HighlightStackView(views: [pathPopup, nav])
-        headerBar.edgeInsets = NSEdgeInsets(top: 3, left: 4, bottom: 3, right: 4)
-        headerBar.wantsLayer = true
-        headerBar.translatesAutoresizingMaskIntoConstraints = false
-        headerBar.setHuggingPriority(.required, for: .vertical)
-        pathPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        pathPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 220).isActive = true
+        trailing.spacing = 0
+        let header = NSStackView(views: [nav, breadcrumb, trailing])
+        header.spacing = 6
+        header.edgeInsets = NSEdgeInsets(top: 6, left: 10, bottom: 6, right: 8)
+        header.translatesAutoresizingMaskIntoConstraints = false
+        header.setHuggingPriority(.required, for: .vertical)
+        let headerLine = NSBox.separator()
+        headerLine.translatesAutoresizingMaskIntoConstraints = false
 
         for c in columns {
             let col = NSTableColumn(identifier: .init(c.rawValue))
@@ -139,8 +141,10 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
         table.dataSource = self
         table.delegate = self
         table.allowsMultipleSelection = true
-        table.usesAlternatingRowBackgroundColors = false
-        table.rowSizeStyle = .small
+        table.usesAlternatingRowBackgroundColors = true
+        table.rowSizeStyle = .custom
+        table.rowHeight = 22
+        table.intercellSpacing = NSSize(width: 6, height: 0)
         table.style = .plain
         table.gridStyleMask = []
         table.columnAutoresizingStyle = .noColumnAutoresizing
@@ -156,24 +160,27 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
         scroll.documentView = table
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
+        scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
 
-        statusLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        statusLabel.textColor = .secondaryLabelColor
-
-        [headerBar, scroll, statusLabel].forEach(root.addSubview)
+        edge.translatesAutoresizingMaskIntoConstraints = false
+        [header, headerLine, scroll, edge].forEach(root.addSubview)
         NSLayoutConstraint.activate([
-            headerBar.topAnchor.constraint(equalTo: root.topAnchor),
-            headerBar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            headerBar.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: headerBar.bottomAnchor),
+            header.topAnchor.constraint(equalTo: root.topAnchor),
+            header.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            headerLine.topAnchor.constraint(equalTo: header.bottomAnchor),
+            headerLine.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            headerLine.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: headerLine.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            statusLabel.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 3),
-            statusLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 6),
-            statusLabel.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -6),
-            statusLabel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -3),
+            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            edge.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            edge.topAnchor.constraint(equalTo: root.topAnchor),
+            edge.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            edge.widthAnchor.constraint(equalToConstant: 3),
         ])
         view = root
         setActive(false)
@@ -186,6 +193,9 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
         b.isBordered = false
         b.toolTip = tip
         b.controlSize = .small
+        b.contentTintColor = .secondaryLabelColor
+        b.widthAnchor.constraint(equalToConstant: 24).isActive = true
+        b.setAccessibilityLabel(tip)
         return b
     }
 
@@ -220,7 +230,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     func setActive(_ active: Bool) {
         isActive = active
-        headerBar.highlighted = active
+        edge.isHidden = !active // the active panel gets the accent edge
     }
 
     func focus() {
@@ -290,25 +300,26 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     }
 
     private func rebuildPathPopup() {
-        pathPopup.removeAllItems()
-        var comps: [String] = ["/"]
-        var acc = ""
-        for part in path.split(separator: "/") {
-            acc += "/" + part
-            comps.append(acc)
-        }
-        for (depth, p) in comps.enumerated() {
-            pathPopup.addItem(withTitle: p == "/" ? "/" : String(p.split(separator: "/").last!))
-            pathPopup.lastItem?.representedObject = p
-            pathPopup.lastItem?.indentationLevel = depth
-            pathPopup.lastItem?.image = NSImage(systemSymbolName: depth == 0 ? (backend.isLocal ? "internaldrive" : "server.rack") : "folder", accessibilityDescription: nil)
-        }
-        pathPopup.selectItem(at: comps.count - 1)
-        pathPopup.toolTip = path
+        breadcrumb.show(path: path, home: backend.isLocal ? backend.homeDirectory : nil)
     }
 
-    @objc private func pathPicked() {
-        if let p = pathPopup.selectedItem?.representedObject as? String { load(p) }
+    /// Double-click the path (or ⌘L): type a folder to open.
+    @objc func goToFolder() {
+        guard let window = view.window else { return }
+        let a = NSAlert()
+        a.messageText = "Go to folder"
+        a.addButton(withTitle: "Go")
+        a.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.stringValue = path
+        a.accessoryView = field
+        a.window.initialFirstResponder = field
+        a.beginSheetModal(for: window) { [weak self] r in
+            guard r == .alertFirstButtonReturn, let self else { return }
+            var p = field.stringValue.trimmingCharacters(in: .whitespaces)
+            if self.backend.isLocal { p = (p as NSString).expandingTildeInPath }
+            if !p.isEmpty { self.load(p) }
+        }
     }
 
     // MARK: Data
@@ -325,6 +336,22 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     var selectedEntries: [RemoteEntry] {
         table.selectedRowIndexes.compactMap { $0 < table.numberOfRows ? entry(at: $0) : nil }
+    }
+
+    /// Re-applies the selection look after activation changes AppKit didn't see
+    /// (the snapshot run forces the active appearance without real focus).
+    func refreshSelectionLook() {
+        table.enumerateAvailableRowViews { row, _ in
+            row.isEmphasized = isActive
+            row.needsDisplay = true
+        }
+    }
+
+    /// Selects entries by name (used by the demo scene and after renames).
+    func selectNames(_ names: Set<String>) {
+        var rows = IndexSet()
+        for (i, e) in entries.enumerated() where names.contains(e.name) { rows.insert(i + (hasParentRow ? 1 : 0)) }
+        table.selectRowIndexes(rows, byExtendingSelection: false)
     }
 
     func selectedPaths() -> [String] { selectedEntries.map { RemotePath.join(path, $0.name) } }
@@ -373,13 +400,13 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
             cell.imageView?.image = icon(for: e)
         case .size: text = e.map { $0.isDirectoryLike ? "" : Format.size($0.size) } ?? ""
         case .type: text = e.map(typeName) ?? "Parent directory"
-        case .changed: text = e?.modified.map(Format.date) ?? ""
+        case .changed: text = e?.modified.map(Format.shortDate) ?? ""
         case .rights, .attr: text = e?.rightsString ?? ""
         case .owner: text = e?.owner ?? ""
         }
         cell.textField?.stringValue = text
         cell.textField?.alignment = column == .size ? .right : .left
-        cell.toolTip = e?.linkTarget.map { "→ \($0)" }
+        cell.toolTip = column == .changed ? e?.modified.map(Format.date) : e?.linkTarget.map { "→ \($0)" }
         return cell
     }
 
@@ -415,8 +442,9 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     private func icon(for e: RemoteEntry?) -> NSImage? {
         guard let e else { return NSImage(systemSymbolName: "arrow.turn.left.up", accessibilityDescription: nil) }
-        if backend.isLocal {
-            return NSWorkspace.shared.icon(forFile: RemotePath.join(path, e.name))
+        let full = RemotePath.join(path, e.name)
+        if backend.isLocal, FileManager.default.fileExists(atPath: full) {
+            return NSWorkspace.shared.icon(forFile: full)
         }
         if e.isDirectoryLike { return NSWorkspace.shared.icon(for: .folder) }
         let ext = (e.name as NSString).pathExtension
@@ -431,13 +459,20 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     func tableViewSelectionDidChange(_ notification: Notification) { updateStatus() }
 
-    /// "0 B of 1.2 MB in 0 of 15" like WinSCP's panel status line.
+    /// "2 of 7 selected · 226 KB" (or "7 items · 1.2 MB" with nothing selected).
     private func updateStatus() {
         let sel = selectedEntries
-        let selSize = sel.filter { !$0.isDirectoryLike }.reduce(0) { $0 + $1.size }
-        let total = entries.filter { !$0.isDirectoryLike }.reduce(0) { $0 + $1.size }
-        statusLabel.stringValue = "\(Format.shortSize(selSize)) of \(Format.shortSize(total)) in \(sel.count) of \(entries.count)"
+        if sel.isEmpty {
+            let total = entries.filter { !$0.isDirectoryLike }.reduce(0) { $0 + $1.size }
+            summary = "\(entries.count) item\(entries.count == 1 ? "" : "s") · \(Format.shortSize(total))"
+        } else {
+            let size = sel.filter { !$0.isDirectoryLike }.reduce(0) { $0 + $1.size }
+            summary = "\(sel.count) of \(entries.count) selected · \(Format.shortSize(size))"
+        }
+        delegate?.panelSummaryDidChange(self)
     }
+
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { AccentRowView() }
 
     // MARK: Commands
 
@@ -551,24 +586,6 @@ extension FilePanel: NSFilePromiseProviderDelegate {
 
 extension NSPasteboard.PasteboardType {
     static let panelEntries = NSPasteboard.PasteboardType("local.duckscp.panel-entry")
-}
-
-/// WinSCP highlights the active panel's path bar. CGColors don't follow appearance
-/// changes, so the colour is re-resolved whenever light/dark switches.
-final class HighlightStackView: NSStackView {
-    var highlighted = false { didSet { updateColor() } }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        updateColor()
-    }
-
-    private func updateColor() {
-        wantsLayer = true
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            layer?.backgroundColor = highlighted ? NSColor.controlAccentColor.withAlphaComponent(0.25).cgColor : NSColor.clear.cgColor
-        }
-    }
 }
 
 final class PanelTableView: NSTableView {

@@ -100,7 +100,7 @@ Organised like WinSCP's Preferences dialog:
 |---|---|
 | Environment | Theme (follow system / light / dark), interface (Commander / Explorer) |
 | Confirmations | Delete, overwrite, quit with queued transfers, close session |
-| Panels | Hidden files (⇧⌘.), size format, double-click action (open / edit / copy), local delete to Trash, synchronized browsing. Folders always sort first. |
+| Panels | Hidden files (⇧⌘.), size format (default short, e.g. "14 KB"), double-click action (open / edit / copy), local delete to Trash, synchronized browsing. Folders always sort first. |
 | Editors | F4 opens **Sublime Text** (4, 3 or 2), falling back to **TextEdit**. A custom editor app can be chosen. |
 | Transfer | Preserve timestamp and permissions, resume with `.filepart` and threshold, speed limit, exclude mask (`*.tmp; .git/`), background by default |
 | Endurance | Auto-reconnect: on/off, attempts, delay |
@@ -112,7 +112,15 @@ Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional
 
 ## Appearance
 
-The app follows macOS light/dark mode by default and switches live. Preferences → Environment can force Light or Dark.
+- **Light/dark** follows macOS by default and switches live. Preferences → Environment can force Light or Dark.
+- **Accent color** follows your macOS accent (System Settings → Appearance). If none is set ("Multicolor"), DuckSCP uses blue. Preferences → Environment → Accent color → Custom lets you pick any color. It drives the active-panel edge, selections, progress bars and the queue.
+- **Layout** is WinSCP's Commander, refined:
+  - session tabs with site colors
+  - clickable breadcrumb paths (`~` for your home folder; double-click to type a path)
+  - an accent edge on the active panel
+  - Finder-style dates ("Today 09:30")
+  - keycap F-key bar
+  - a status bar with the selection summary and an encryption pill (green lock = encrypted, orange = plain FTP/HTTP)
 
 ## Commander window
 
@@ -121,7 +129,7 @@ The app follows macOS light/dark mode by default and switches live. Preferences 
 | F2 | Rename |
 | F4 | Edit in Sublime Text, falling back to TextEdit (remote files: download, edit, upload on every save) |
 | F5 / F6 | Copy / Move to the other panel |
-| F7 | Create directory |
+| F7 | New folder |
 | F8 | Delete (local items go to the Trash unless turned off in Preferences) |
 | F9 | Properties and permissions |
 | Tab | Switch panel |

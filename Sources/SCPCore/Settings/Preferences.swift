@@ -9,6 +9,11 @@ public struct Preferences: Codable, Equatable {
     public enum Interface: String, Codable, CaseIterable { case commander, explorer }
     public var theme: Theme = .system
     public var interface: Interface = .commander
+    /// Accent colour: follow macOS (blue when no accent is set) or a custom colour.
+    public enum AccentMode: String, Codable, CaseIterable { case system, custom }
+    public var accentMode: AccentMode = .system
+    /// "#RRGGBB", used when `accentMode == .custom`.
+    public var customAccentHex = "#007AFF"
 
     // MARK: Confirmations
     public var confirmDelete = true
@@ -20,7 +25,7 @@ public struct Preferences: Codable, Equatable {
     public enum SizeFormat: String, Codable, CaseIterable { case bytes, kilobytes, short }
     public enum DoubleClickAction: String, Codable, CaseIterable { case open, edit, copy }
     public var showHiddenFiles = true
-    public var sizeFormat: SizeFormat = .bytes
+    public var sizeFormat: SizeFormat = .short
     public var doubleClickAction: DoubleClickAction = .edit
     public var useTrashForLocalDelete = true
     public var synchronizedBrowsing = false
@@ -64,6 +69,7 @@ public struct Preferences: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func get<T: Decodable>(_ k: CodingKeys, _ into: inout T) { if let v = try? c.decode(T.self, forKey: k) { into = v } }
         get(.theme, &theme); get(.interface, &interface)
+        get(.accentMode, &accentMode); get(.customAccentHex, &customAccentHex)
         get(.confirmDelete, &confirmDelete); get(.confirmOverwrite, &confirmOverwrite)
         get(.confirmExitWithTransfers, &confirmExitWithTransfers); get(.confirmDisconnect, &confirmDisconnect)
         get(.showHiddenFiles, &showHiddenFiles); get(.sizeFormat, &sizeFormat); get(.doubleClickAction, &doubleClickAction)

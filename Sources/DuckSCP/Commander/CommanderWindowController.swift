@@ -10,10 +10,10 @@ final class SessionTab {
     let queue: TransferQueue
     var lastActive: FilePanel
 
-    init(session: RemoteSession) {
+    init(session: RemoteSession, localBackend: PanelBackend = LocalBackend()) {
         self.session = session
         queue = TransferQueue(connect: session.makeConnection)
-        local = FilePanel(backend: LocalBackend(), path: session.site.localDirectory.isEmpty ? nil : session.site.localDirectory)
+        local = FilePanel(backend: localBackend, path: session.site.localDirectory.isEmpty ? nil : session.site.localDirectory)
         remote = FilePanel(backend: RemoteBackend(session: session),
                            path: session.site.remoteDirectory.isEmpty ? nil : session.site.remoteDirectory)
         lastActive = remote
@@ -31,17 +31,18 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     var onNewSession: (() -> Void)?
     var transfers: TransferController!
 
-    private let tabBar = NSStackView()
+    private let tabBar = SessionTabStrip()
     private let split = NSSplitView()
     private let statusBytes = label("")
-    private let statusProtocol = label("")
+    private let statusSummary = label("")
+    private let statusProtocol = StatusPill()
     private let statusTime = label("")
     private var timer: Timer?
     let queueContainer = NSView()
     var queueHeight: NSLayoutConstraint!
 
     init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 680),
+        let window = SnapshotWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 680),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.minSize = NSSize(width: 760, height: 420)
         window.setFrameAutosaveName("Commander")
@@ -69,11 +70,17 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         window.toolbar = toolbar
         window.toolbarStyle = .expanded
 
-        tabBar.orientation = .horizontal
-        tabBar.spacing = 0
-        tabBar.alignment = .bottom
-        tabBar.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 0, right: 6)
         tabBar.translatesAutoresizingMaskIntoConstraints = false
+        tabBar.onSelect = { [weak self] i in
+            guard let self, self.tabs.indices.contains(i) else { return }
+            self.select(self.tabs[i])
+        }
+        tabBar.onNew = { [weak self] in self?.newSession() }
+        tabBar.onClose = { [weak self] i in
+            guard let self, self.tabs.indices.contains(i) else { return }
+            self.select(self.tabs[i])
+            self.disconnect()
+        }
 
         split.isVertical = true
         split.dividerStyle = .thin
@@ -83,56 +90,56 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         queueHeight = queueContainer.heightAnchor.constraint(equalToConstant: 0)
         queueHeight.isActive = true
 
+        // F-key bar as keycap chips; F10 Quit is dropped (⌘Q on a Mac).
         let fkeys = NSStackView(views: [
-            fkey("F2 Rename", #selector(cmdRename)), fkey("F4 Edit", #selector(cmdEdit)),
-            fkey("F5 Copy", #selector(cmdCopy)), fkey("F6 Move", #selector(cmdMove)),
-            fkey("F7 Create Directory", #selector(cmdMakeDir)), fkey("F8 Delete", #selector(cmdDelete)),
-            fkey("F9 Properties", #selector(cmdProperties)), fkey("F10 Quit", #selector(NSApplication.terminate(_:))),
+            KeycapButton(key: "F2", title: "Rename", target: self, action: #selector(cmdRename)),
+            KeycapButton(key: "F4", title: "Edit", target: self, action: #selector(cmdEdit)),
+            KeycapButton(key: "F5", title: "Copy", target: self, action: #selector(cmdCopy)),
+            KeycapButton(key: "F6", title: "Move", target: self, action: #selector(cmdMove)),
+            KeycapButton(key: "F7", title: "New Folder", target: self, action: #selector(cmdMakeDir)),
+            KeycapButton(key: "F8", title: "Delete", target: self, action: #selector(cmdDelete)),
+            KeycapButton(key: "F9", title: "Properties", target: self, action: #selector(cmdProperties)),
         ])
-        fkeys.distribution = .fillEqually
-        fkeys.spacing = 2
+        fkeys.spacing = 14
+        fkeys.edgeInsets = NSEdgeInsets(top: 6, left: 12, bottom: 4, right: 12)
         fkeys.translatesAutoresizingMaskIntoConstraints = false
+        let fkeyLine = NSBox.separator()
+        fkeyLine.translatesAutoresizingMaskIntoConstraints = false
 
-        [statusBytes, statusProtocol, statusTime].forEach { $0.font = .systemFont(ofSize: NSFont.smallSystemFontSize) }
-        let status = NSStackView(views: [statusBytes, NSView(), statusProtocol, separator(), statusTime])
+        [statusSummary, statusBytes, statusTime].forEach {
+            $0.font = .systemFont(ofSize: 11)
+            $0.textColor = .secondaryLabelColor
+        }
+        statusTime.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        let status = NSStackView(views: [statusSummary, statusBytes, NSView(), statusProtocol, statusTime])
+        status.spacing = 12
         status.translatesAutoresizingMaskIntoConstraints = false
-        status.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+        status.edgeInsets = NSEdgeInsets(top: 3, left: 12, bottom: 6, right: 12)
+        content.addSubview(fkeyLine)
 
         [tabBar, split, queueContainer, fkeys, status].forEach(content.addSubview)
         NSLayoutConstraint.activate([
             tabBar.topAnchor.constraint(equalTo: content.topAnchor),
             tabBar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            tabBar.heightAnchor.constraint(equalToConstant: 28),
+            tabBar.heightAnchor.constraint(equalToConstant: 32),
             split.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
             split.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             split.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             queueContainer.topAnchor.constraint(equalTo: split.bottomAnchor),
             queueContainer.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             queueContainer.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            fkeys.topAnchor.constraint(equalTo: queueContainer.bottomAnchor, constant: 4),
-            fkeys.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 4),
-            fkeys.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -4),
-            status.topAnchor.constraint(equalTo: fkeys.bottomAnchor, constant: 2),
+            fkeyLine.topAnchor.constraint(equalTo: queueContainer.bottomAnchor),
+            fkeyLine.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            fkeyLine.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            fkeys.topAnchor.constraint(equalTo: fkeyLine.bottomAnchor),
+            fkeys.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            fkeys.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor),
+            status.topAnchor.constraint(equalTo: fkeys.bottomAnchor),
             status.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             status.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             status.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
-    }
-
-    private func fkey(_ title: String, _ action: Selector) -> NSButton {
-        let b = NSButton(title: title, target: self, action: action)
-        b.bezelStyle = .rounded
-        b.controlSize = .small
-        b.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        if action == #selector(NSApplication.terminate(_:)) { b.target = nil }
-        return b
-    }
-
-    private func separator() -> NSBox {
-        let b = NSBox()
-        b.boxType = .separator
-        return b
     }
 
     // MARK: Toolbar
@@ -185,8 +192,8 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     // MARK: Tabs
 
-    func add(session: RemoteSession) {
-        let tab = SessionTab(session: session)
+    func add(session: RemoteSession, localBackend: PanelBackend = LocalBackend()) {
+        let tab = SessionTab(session: session, localBackend: localBackend)
         tab.local.delegate = self
         tab.remote.delegate = self
         tab.local.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
@@ -221,30 +228,11 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     }
 
     private func rebuildTabBar() {
-        tabBar.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for (i, tab) in tabs.enumerated() {
-            let b = NSButton(title: tab.title, target: self, action: #selector(tabClicked(_:)))
-            b.tag = i
-            b.bezelStyle = .smallSquare
-            b.setButtonType(.pushOnPushOff)
-            b.state = tab === current ? .on : .off
-            b.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: nil)
-            b.imagePosition = .imageLeading
-            if let c = tab.session.site.color { b.contentTintColor = NSColor(winscpColor: c) }
-            b.toolTip = "\(tab.session.site.displayTarget) (\(tab.session.protocolName))"
-            tabBar.addArrangedSubview(b)
+        tabBar.tabs = tabs.map { tab in
+            SessionTabStrip.Tab(title: tab.title, color: tab.session.site.color.map(NSColor.init(winscpColor:)),
+                                tooltip: "\(tab.session.site.displayTarget) (\(tab.session.protocolName))")
         }
-        let plus = NSButton(title: "New Tab", target: self, action: #selector(newSession))
-        plus.bezelStyle = .smallSquare
-        plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: nil)
-        plus.imagePosition = .imageLeading
-        tabBar.addArrangedSubview(plus)
-        tabBar.addArrangedSubview(NSView())
-    }
-
-    @objc private func tabClicked(_ sender: NSButton) {
-        guard tabs.indices.contains(sender.tag) else { return }
-        select(tabs[sender.tag])
+        tabBar.selected = tabs.firstIndex { $0 === current } ?? 0
     }
 
     @objc func newSession() { onNewSession?() }
@@ -314,6 +302,11 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         current?.lastActive = panel
         current?.local.setActive(panel === current?.local)
         current?.remote.setActive(panel === current?.remote)
+        statusSummary.stringValue = panel.summary
+    }
+
+    func panelSummaryDidChange(_ panel: FilePanel) {
+        if panel === activePanel { statusSummary.stringValue = panel.summary }
     }
 
     func panelPathDidChange(_ panel: FilePanel) {
@@ -544,8 +537,9 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
             window?.title = Branding.appName
             return
         }
-        // WinSCP: "path - user@host - AppName"
-        window?.title = "\(RemotePath.name(tab.remote.path).isEmpty ? "/" : RemotePath.name(tab.remote.path)) - \(tab.session.site.displayTarget) - \(Branding.appName)"
+        // "html — deploy@web01.example.com" (macOS document-title style)
+        let folder = RemotePath.name(tab.remote.path).isEmpty ? "/" : RemotePath.name(tab.remote.path)
+        window?.title = "\(folder) — \(tab.session.site.displayTarget)"
     }
 
     /// Shows a transient message (e.g. reconnecting) in the status bar.
@@ -559,8 +553,12 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     func updateStatusBar() {
         guard let tab = current else { return }
+        statusSummary.stringValue = activePanel?.summary ?? ""
         statusBytes.stringValue = Date() < statusMessageUntil ? statusMessage : transfers.statusText
-        statusProtocol.stringValue = "🔒 \(tab.session.protocolName)"
+        let proto = tab.session.protocolName
+        statusProtocol.text = proto
+        // Plain FTP, and WebDAV/S3 without TLS, travel unencrypted.
+        statusProtocol.secure = !(proto == "FTP" || proto == "WebDAV" || (proto == "S3" && tab.session.site.ftpEncryption == .none))
         statusTime.stringValue = Format.duration(Date().timeIntervalSince(tab.session.connectedAt))
     }
 

@@ -44,7 +44,7 @@ final class TransferController {
             queueView.translatesAutoresizingMaskIntoConstraints = false
             commander.queueContainer.addSubview(queueView)
             NSLayoutConstraint.activate([
-                queueView.topAnchor.constraint(equalTo: commander.queueContainer.topAnchor, constant: 4),
+                queueView.topAnchor.constraint(equalTo: commander.queueContainer.topAnchor),
                 queueView.leadingAnchor.constraint(equalTo: commander.queueContainer.leadingAnchor),
                 queueView.trailingAnchor.constraint(equalTo: commander.queueContainer.trailingAnchor),
                 queueView.bottomAnchor.constraint(equalTo: commander.queueContainer.bottomAnchor),
@@ -57,7 +57,7 @@ final class TransferController {
 
     func setQueueVisible(_ visible: Bool) {
         queueVisible = visible
-        commander.queueHeight.constant = visible ? 150 : 0
+        commander.queueHeight.constant = visible ? 110 : 0
         queueView.isHidden = !visible
     }
 

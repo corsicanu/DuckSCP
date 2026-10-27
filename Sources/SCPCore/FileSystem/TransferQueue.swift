@@ -55,7 +55,12 @@ public final class TransferQueue {
             self.options = options
         }
 
+        /// Overrides what the queue shows as source / destination (e.g. "~/Projects/web/app.js").
+        public var displaySource: String?
+        public var displayTarget: String?
+
         public var sourceDescription: String {
+            if let displaySource { return displaySource }
             let names = direction == .upload ? localSources.map(\.lastPathComponent) : remoteSources.map(\.name)
             let first = names.first.map { RemotePath.join(sourceDir, $0) } ?? sourceDir
             return names.count > 1 ? "\(first) (+\(names.count - 1))" : first

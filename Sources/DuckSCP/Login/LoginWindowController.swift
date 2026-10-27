@@ -37,9 +37,9 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     init(store: SiteStore, hostKeys: HostKeyStore) {
         self.store = store
         self.hostKeys = hostKeys
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 440),
+        let window = SnapshotWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: 440),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "Login - \(Branding.appName)"
+        window.title = "Login — \(Branding.appName)"
         window.minSize = NSSize(width: 600, height: 400)
         super.init(window: window)
         window.delegate = self
@@ -296,6 +296,8 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     }
 
     func outlineViewSelectionDidChange(_ notification: Notification) { selectionChanged() }
+
+    func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? { AccentRowView() }
 
     private var selectedNode: Node? { outline.item(atRow: outline.selectedRow) as? Node }
 

@@ -13,7 +13,7 @@ final class PreferencesWindowController: NSWindowController {
     init(store: PreferencesStore, hostKeys: HostKeyStore) {
         self.store = store
         self.hostKeys = hostKeys
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 440),
+        let window = SnapshotWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 440),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.title = "Preferences"
         super.init(window: window)
@@ -56,6 +56,9 @@ final class PreferencesWindowController: NSWindowController {
                 popup("Theme:", [("Follow system", Preferences.Theme.system), ("Light", .light), ("Dark", .dark)], \.theme),
                 popup("Interface:", [("Commander (two panels)", Preferences.Interface.commander),
                                      ("Explorer (remote panel only)", .explorer)], \.interface),
+                popup("Accent color:", [("Follow macOS (blue if none set)", Preferences.AccentMode.system),
+                                        ("Custom", .custom)], \.accentMode),
+                [label("Custom color:"), accentWell()],
             ]),
             ("Confirmations", [
                 check("Confirm deleting files", \.confirmDelete),
@@ -158,6 +161,22 @@ final class PreferencesWindowController: NSWindowController {
         refreshers.append { [weak self, weak f] in f?.stringValue = self?.store.current[keyPath: kp] ?? "" }
         refreshers.last?()
         return [label(title), f]
+    }
+
+    /// Swatch that opens the macOS colour panel; picking a colour switches to Custom.
+    private func accentWell() -> NSView {
+        let swatch = ColorSwatchButton()
+        swatch.onChange = { [weak self] color in
+            self?.update { $0.customAccentHex = color.hexString; $0.accentMode = .custom }
+        }
+        let reset = actionButton("Use macOS Accent") { [weak self] in self?.update { $0.accentMode = .system } }
+        refreshers.append { [weak self, weak swatch] in
+            guard let self else { return }
+            swatch?.color = NSColor(hex: self.store.current.customAccentHex) ?? Theme.fallback
+            reset.isEnabled = self.store.current.accentMode == .custom
+        }
+        refreshers.last?()
+        return NSStackView(views: [swatch, reset])
     }
 
     private func note(_ text: String) -> NSTextField {
