@@ -53,9 +53,18 @@ extension NSMenu {
 extension NSWindow {
     /// Renders the content view into a PNG; used by --snapshot for headless UI checks.
     func writeSnapshot(to url: URL) {
-        // Drawing through PDF renders controls faithfully even when the window is not on screen.
-        guard let view = contentView, let image = NSImage(data: view.dataWithPDF(inside: view.bounds)),
-              let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return }
+        // PDF drawing renders controls faithfully even off screen, but skips the window
+        // background, so paint that first in the window's own (light or dark) appearance.
+        guard let view = contentView, let pdf = NSImage(data: view.dataWithPDF(inside: view.bounds)) else { return }
+        let image = NSImage(size: view.bounds.size)
+        image.lockFocus()
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            NSColor.windowBackgroundColor.setFill()
+            NSRect(origin: .zero, size: view.bounds.size).fill()
+        }
+        pdf.draw(in: NSRect(origin: .zero, size: view.bounds.size))
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return }
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
     }
 }

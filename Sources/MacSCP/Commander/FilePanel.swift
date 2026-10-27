@@ -63,7 +63,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     private let table = PanelTableView()
     private let pathPopup = NSPopUpButton()
     private let statusLabel = label("")
-    private var headerBar = NSStackView()
+    private var headerBar = HighlightStackView()
     private let columns: [PanelColumn]
 
     static let parentName = ".."
@@ -96,7 +96,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
             toolButton("arrow.clockwise", "Refresh", #selector(refresh)),
         ])
         nav.spacing = 2
-        headerBar = NSStackView(views: [pathPopup, nav])
+        headerBar = HighlightStackView(views: [pathPopup, nav])
         headerBar.edgeInsets = NSEdgeInsets(top: 3, left: 4, bottom: 3, right: 4)
         headerBar.wantsLayer = true
         headerBar.translatesAutoresizingMaskIntoConstraints = false
@@ -202,8 +202,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     func setActive(_ active: Bool) {
         isActive = active
-        // WinSCP highlights the active panel's path bar.
-        headerBar.layer?.backgroundColor = active ? NSColor.controlAccentColor.withAlphaComponent(0.25).cgColor : NSColor.clear.cgColor
+        headerBar.highlighted = active
     }
 
     func focus() {
@@ -499,6 +498,24 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
 extension NSPasteboard.PasteboardType {
     static let panelEntries = NSPasteboard.PasteboardType("local.macscp.panel-entry")
+}
+
+/// WinSCP highlights the active panel's path bar. CGColors don't follow appearance
+/// changes, so the colour is re-resolved whenever light/dark switches.
+final class HighlightStackView: NSStackView {
+    var highlighted = false { didSet { updateColor() } }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColor()
+    }
+
+    private func updateColor() {
+        wantsLayer = true
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = highlighted ? NSColor.controlAccentColor.withAlphaComponent(0.25).cgColor : NSColor.clear.cgColor
+        }
+    }
 }
 
 final class PanelTableView: NSTableView {

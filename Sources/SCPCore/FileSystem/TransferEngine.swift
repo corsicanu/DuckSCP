@@ -27,6 +27,12 @@ public final class TransferEngine {
         /// Upload only: copy local permission bits to the server.
         public var preservePermissions = false
         public var resume = true
+        /// Files at least this big go through a ".filepart" temp file.
+        public var partialThreshold: UInt64 = TransferEngine.partialThreshold
+        /// Bytes per second; 0 = unlimited.
+        public var speedLimit: UInt64 = 0
+        /// Files and folders matching this mask are skipped.
+        public var exclude = FileMask("")
         public init() {}
     }
 

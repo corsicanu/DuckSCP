@@ -23,10 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                               secrets: KeychainSecretStore(service: Branding.bundleID + ".sites"))
         }
 
-        if snapshotDir != nil { NSApp.appearance = NSAppearance(named: .aqua) } // PDF snapshots draw no window background
         let support = SiteStore.defaultURL(appName: Branding.appName).deletingLastPathComponent()
         hostKeys = HostKeyStore(fileURL: dataDir.map { URL(fileURLWithPath: $0).appendingPathComponent("host_keys.json") }
                                 ?? support.appendingPathComponent("host_keys.json"))
+        prefs = PreferencesStore(fileURL: dataDir.map { URL(fileURLWithPath: $0).appendingPathComponent("preferences.json") }
+                                 ?? support.appendingPathComponent("preferences.json"))
+        applyTheme()
+        if let forced = value(after: "--appearance", in: args) { // snapshot testing
+            NSApp.appearance = NSAppearance(named: forced == "dark" ? .darkAqua : .aqua)
+        }
+        NotificationCenter.default.addObserver(forName: PreferencesStore.didChange, object: nil, queue: .main) { [weak self] _ in
+            self?.applyTheme()
+        }
         NSApp.mainMenu = MainMenu.build()
         showLogin()
         if let ini = value(after: "--import", in: args) {
@@ -98,6 +106,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private(set) var hostKeys: HostKeyStore!
+    private(set) var prefs: PreferencesStore!
+
+    /// System = follow macOS light/dark automatically.
+    func applyTheme() {
+        switch prefs.current.theme {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
     private var connecting: [ConnectingWindow] = []
 
     /// Connects in the background behind WinSCP's progress dialog, then opens a tab.
