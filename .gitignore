@@ -1,0 +1,10 @@
+.build/
+build/
+*.xcodeproj/
+.swiftpm/
+.DS_Store
+# Real WinSCP configs hold (obfuscated) passwords. Never commit them.
+fixtures/winscp.ini
+*.ini
+!fixtures/winscp.sample.ini
+!Tests/**/Fixtures/*.ini
