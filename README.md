@@ -1,10 +1,12 @@
-# MacSCP
+<p align="center"><img src="branding/logo.png" alt="DuckSCP" width="560"></p>
 
-A native macOS file transfer client modelled 1:1 on WinSCP's interface and behaviour.
-It imports your existing `WinSCP.ini` sites, including saved passwords.
+# DuckSCP
 
-> Working name. The product name, bundle id and version live in [`branding.env`](branding.env).
-> "WinSCP" is a trademark of its authors; this project is not affiliated with it and contains no WinSCP code.
+A native macOS file transfer client modelled on WinSCP's interface and behaviour: SFTP, SCP, FTP/FTPS, WebDAV and S3.
+It imports your existing `WinSCP.ini` sites, including saved passwords, workspaces and preferences.
+
+> "WinSCP" is a trademark of its authors. DuckSCP is an independent project, not affiliated with or endorsed by WinSCP, and contains no WinSCP code.
+> The product name, bundle id and version live in [`branding.env`](branding.env); the icon is generated from [`branding/logo-source.jpg`](branding/logo-source.jpg) by [`tools/make_icon.py`](tools/make_icon.py).
 
 ## Status
 
@@ -25,7 +27,7 @@ Needs macOS 13+, Swift 5.9+ (Command Line Tools are enough, Xcode is optional) a
 scripts/build_app.sh --install
 ```
 
-This builds `build/MacSCP.app`, signs it ad hoc and copies it to `~/Applications`.
+This builds `build/DuckSCP.app`, signs it ad hoc and copies it to `~/Applications`.
 
 ```bash
 scripts/test.sh
@@ -51,11 +53,13 @@ scripts/test_httpd.sh start
 
 Without these servers, the integration tests are skipped.
 
+Upgrading from the earlier working name (MacSCP): on first launch, DuckSCP moves `~/Library/Application Support/MacSCP` and copies saved passwords to its own Keychain entries.
+
 ## Importing WinSCP.ini
 
 1. On Windows, find the file: WinSCP → Tools → Preferences → Storage. If the configuration is in the registry, choose **Export/backup configuration** to get an `.ini`.
 2. Copy it to the Mac.
-3. In MacSCP's Login window: **Tools ▾ → Import Sites from WinSCP.ini…**
+3. In DuckSCP's Login window: **Tools ▾ → Import Sites from WinSCP.ini…**
 
 What is imported, per site: folder path, protocol (SFTP, SCP, FTP, WebDAV, S3), host, port, user, password, FTP encryption and passive mode, private key path, remote directory, note, colour.
 
@@ -81,7 +85,7 @@ Organised like WinSCP's Preferences dialog:
 | Transfer | Preserve timestamp and permissions, resume with `.filepart` and threshold, speed limit, exclude mask (`*.tmp; .git/`), background by default |
 | Endurance | Auto-reconnect: on/off, attempts, delay |
 | Network | Connection timeout, keepalive interval, IPv4/IPv6 |
-| Logging | Session log (default `~/Library/Logs/MacSCP/session.log`). Paths and errors only, never passwords. |
+| Logging | Session log (default `~/Library/Logs/DuckSCP/session.log`). Paths and errors only, never passwords. |
 | Security | Clear cached host keys |
 
 Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional user and password; the password is a separate Keychain entry), SSH compression and a timezone offset, on top of the key, directories, SCP fallback and passive mode. Importing a `WinSCP.ini` also brings over the WinSCP preferences it recognises (confirmations, hidden files, double-click action, preserve time and rights, resume, speed limit) and per-site Compression / TimeDifference / proxy settings.
@@ -128,7 +132,7 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 
 ## Connecting
 
-- **Command line:** `MacSCP --open "Folder/Site name"` opens a stored site, like `winscp.exe "Site name"`.
+- **Command line:** `DuckSCP --open "Folder/Site name"` opens a stored site, like `winscp.exe "Site name"`.
 - **Authentication order:** private key from the site settings, then ssh-agent, then keyboard-interactive and password. You are prompted if no password is stored.
 - **Keys:** OpenSSH and PEM keys, encrypted or not. PuTTY `.ppk` v2 and v3 unencrypted, and v2 encrypted. Encrypted v3 `.ppk` files use Argon2; convert those with PuTTYgen → Conversions → Export OpenSSH key.
 - **SCP mode** runs `ls`, `mv`, `rm`, `chmod` and `touch` on the server, so it needs a POSIX shell, like WinSCP's SCP mode. Listings use `TZ=UTC` and the most precise date format the server's `ls` supports.
@@ -136,7 +140,7 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - **WebDAV:** Encryption = TLS means HTTPS. Downloads resume with HTTP Range. Uploads restart, because a plain PUT cannot append. There are no permissions; folder rename uses MOVE.
 - **S3:** user name = access key ID, password = secret access key, and the region is under Advanced (default `us-east-1`). Path-style addressing works with AWS and S3-compatible servers (MinIO, Wasabi, R2…). `/` lists buckets and folders are `/` prefixes. Listings page past 1,000 objects. Files are renamed by server-side copy plus delete. Single uploads are limited to 5 GB (no multipart yet).
 - HTTPS for WebDAV/S3 uses the same certificate pinning flow as FTPS.
-- **Host keys** are checked against MacSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
+- **Host keys** are checked against DuckSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
 
 ## Large directories
 
@@ -145,7 +149,7 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 ## Security
 
 - Passwords are stored in the macOS Keychain (`WhenUnlockedThisDeviceOnly`, no iCloud sync). They are never written to disk.
-- Site settings live in `~/Library/Application Support/MacSCP/sites.json`, with folder mode `0700` and file mode `0600`.
+- Site settings live in `~/Library/Application Support/DuckSCP/sites.json`, with folder mode `0700` and file mode `0600`.
 - Host keys are cached in `host_keys.json` next to `sites.json`, mode `0600`.
 - File names received from servers are validated before anything is written locally, so `../` and `/` cannot escape the target folder.
 - New local files are created with `O_NOFOLLOW`, so a planted symlink is never followed.
@@ -169,7 +173,8 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 ## Developer notes
 
 - `Sources/SCPCore`: UI-free library (INI parsing, import, models, storage). Unit-tested.
-- `Sources/MacSCP`: AppKit app.
-- `MacSCP --snapshot <dir> [--import file.ini] [--appearance dark|light]` renders every window to PNG and quits. It uses throwaway storage. Use it to check the UI without screen access.
-- `MacSCP --demo-commander` opens a Commander tab whose "remote" side is the local disk.
-- `MacSCP --data-dir <dir>` runs against a separate site store with in-memory passwords.
+- `Sources/DuckSCP`: AppKit app.
+- `Sources/CLibSSH2`, `Sources/CCurl`: thin C shims over libssh2 and libcurl (macros and callbacks Swift cannot call).
+- `DuckSCP --snapshot <dir> [--import file.ini] [--appearance dark|light]` renders every window to PNG and quits. It uses throwaway storage. Use it to check the UI without screen access.
+- `DuckSCP --demo-commander` opens a Commander tab whose "remote" side is the local disk.
+- `DuckSCP --data-dir <dir>` runs against a separate site store with in-memory passwords.

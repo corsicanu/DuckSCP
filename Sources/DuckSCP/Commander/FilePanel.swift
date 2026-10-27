@@ -549,7 +549,7 @@ extension FilePanel: NSFilePromiseProviderDelegate {
 }
 
 extension NSPasteboard.PasteboardType {
-    static let panelEntries = NSPasteboard.PasteboardType("local.macscp.panel-entry")
+    static let panelEntries = NSPasteboard.PasteboardType("local.duckscp.panel-entry")
 }
 
 /// WinSCP highlights the active panel's path bar. CGColors don't follow appearance

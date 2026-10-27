@@ -142,7 +142,7 @@ final class PreferencesWindowController: NSWindowController {
     }
 
     private func number(_ title: String, _ kp: WritableKeyPath<Preferences, Int>) -> [NSView] {
-        let f = MacSCP.textField(80)
+        let f = DuckSCP.textField(80)
         f.formatter = { let n = NumberFormatter(); n.minimum = 0; n.maximum = 1_000_000; n.allowsFloats = false; return n }()
         bindAction(f) { [weak self, weak f] in self?.update { $0[keyPath: kp] = f?.integerValue ?? 0 } }
         refreshers.append { [weak self, weak f] in f?.integerValue = self?.store.current[keyPath: kp] ?? 0 }
@@ -151,7 +151,7 @@ final class PreferencesWindowController: NSWindowController {
     }
 
     private func text(_ title: String, _ kp: WritableKeyPath<Preferences, String>, placeholder: String) -> [NSView] {
-        let f = MacSCP.textField(340)
+        let f = DuckSCP.textField(340)
         f.placeholderString = placeholder
         bindAction(f) { [weak self, weak f] in self?.update { $0[keyPath: kp] = f?.stringValue ?? "" } }
         refreshers.append { [weak self, weak f] in f?.stringValue = self?.store.current[keyPath: kp] ?? "" }

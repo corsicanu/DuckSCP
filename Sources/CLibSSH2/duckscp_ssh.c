@@ -1,4 +1,4 @@
-#include "macscp_ssh.h"
+#include "duckscp_ssh.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -10,7 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-int macscp_tcp_connect(const char *host, int port, int timeout_ms, int family, int *gai_error) {
+int duckscp_tcp_connect(const char *host, int port, int timeout_ms, int family, int *gai_error) {
     struct addrinfo hints, *res = NULL, *ai;
     char portstr[16];
     int fd = -1;
@@ -56,7 +56,7 @@ int macscp_tcp_connect(const char *host, int port, int timeout_ms, int family, i
     return fd;
 }
 
-LIBSSH2_SESSION *macscp_session_init(void) {
+LIBSSH2_SESSION *duckscp_session_init(void) {
     return libssh2_session_init_ex(NULL, NULL, NULL, NULL);
 }
 
@@ -74,7 +74,7 @@ static void kbdint_cb(const char *name, int name_len, const char *instruction, i
     }
 }
 
-int macscp_userauth_kbdint(LIBSSH2_SESSION *s, const char *user, const char *password) {
+int duckscp_userauth_kbdint(LIBSSH2_SESSION *s, const char *user, const char *password) {
     void **abstract = libssh2_session_abstract(s);
     void *saved = *abstract;
     *abstract = (void *)password;
@@ -83,74 +83,74 @@ int macscp_userauth_kbdint(LIBSSH2_SESSION *s, const char *user, const char *pas
     return rc;
 }
 
-int macscp_userauth_password(LIBSSH2_SESSION *s, const char *user, const char *password) {
+int duckscp_userauth_password(LIBSSH2_SESSION *s, const char *user, const char *password) {
     return libssh2_userauth_password_ex(s, user, (unsigned int)strlen(user), password, (unsigned int)strlen(password), NULL);
 }
 
-const char *macscp_last_error(LIBSSH2_SESSION *s, int *code) {
+const char *duckscp_last_error(LIBSSH2_SESSION *s, int *code) {
     char *msg = NULL;
     *code = libssh2_session_last_error(s, &msg, NULL, 0);
     return msg ? msg : "";
 }
 
-LIBSSH2_SFTP_HANDLE *macscp_sftp_open(LIBSSH2_SFTP *sftp, const char *path, unsigned long flags, long mode) {
+LIBSSH2_SFTP_HANDLE *duckscp_sftp_open(LIBSSH2_SFTP *sftp, const char *path, unsigned long flags, long mode) {
     return libssh2_sftp_open_ex(sftp, path, (unsigned int)strlen(path), flags, mode, LIBSSH2_SFTP_OPENFILE);
 }
 
-LIBSSH2_SFTP_HANDLE *macscp_sftp_opendir(LIBSSH2_SFTP *sftp, const char *path) {
+LIBSSH2_SFTP_HANDLE *duckscp_sftp_opendir(LIBSSH2_SFTP *sftp, const char *path) {
     return libssh2_sftp_open_ex(sftp, path, (unsigned int)strlen(path), 0, 0, LIBSSH2_SFTP_OPENDIR);
 }
 
-int macscp_sftp_stat(LIBSSH2_SFTP *sftp, const char *path, LIBSSH2_SFTP_ATTRIBUTES *attrs) {
+int duckscp_sftp_stat(LIBSSH2_SFTP *sftp, const char *path, LIBSSH2_SFTP_ATTRIBUTES *attrs) {
     return libssh2_sftp_stat_ex(sftp, path, (unsigned int)strlen(path), LIBSSH2_SFTP_STAT, attrs);
 }
 
-int macscp_sftp_lstat(LIBSSH2_SFTP *sftp, const char *path, LIBSSH2_SFTP_ATTRIBUTES *attrs) {
+int duckscp_sftp_lstat(LIBSSH2_SFTP *sftp, const char *path, LIBSSH2_SFTP_ATTRIBUTES *attrs) {
     return libssh2_sftp_stat_ex(sftp, path, (unsigned int)strlen(path), LIBSSH2_SFTP_LSTAT, attrs);
 }
 
-int macscp_sftp_setstat(LIBSSH2_SFTP *sftp, const char *path, LIBSSH2_SFTP_ATTRIBUTES *attrs) {
+int duckscp_sftp_setstat(LIBSSH2_SFTP *sftp, const char *path, LIBSSH2_SFTP_ATTRIBUTES *attrs) {
     return libssh2_sftp_stat_ex(sftp, path, (unsigned int)strlen(path), LIBSSH2_SFTP_SETSTAT, attrs);
 }
 
-int macscp_sftp_mkdir(LIBSSH2_SFTP *sftp, const char *path, long mode) {
+int duckscp_sftp_mkdir(LIBSSH2_SFTP *sftp, const char *path, long mode) {
     return libssh2_sftp_mkdir_ex(sftp, path, (unsigned int)strlen(path), mode);
 }
 
-int macscp_sftp_rmdir(LIBSSH2_SFTP *sftp, const char *path) {
+int duckscp_sftp_rmdir(LIBSSH2_SFTP *sftp, const char *path) {
     return libssh2_sftp_rmdir_ex(sftp, path, (unsigned int)strlen(path));
 }
 
-int macscp_sftp_unlink(LIBSSH2_SFTP *sftp, const char *path) {
+int duckscp_sftp_unlink(LIBSSH2_SFTP *sftp, const char *path) {
     return libssh2_sftp_unlink_ex(sftp, path, (unsigned int)strlen(path));
 }
 
-int macscp_sftp_rename(LIBSSH2_SFTP *sftp, const char *from, const char *to) {
+int duckscp_sftp_rename(LIBSSH2_SFTP *sftp, const char *from, const char *to) {
     return libssh2_sftp_rename_ex(sftp, from, (unsigned int)strlen(from), to, (unsigned int)strlen(to),
                                   LIBSSH2_SFTP_RENAME_ATOMIC | LIBSSH2_SFTP_RENAME_NATIVE);
 }
 
-int macscp_sftp_realpath(LIBSSH2_SFTP *sftp, const char *path, char *out, unsigned int out_len) {
+int duckscp_sftp_realpath(LIBSSH2_SFTP *sftp, const char *path, char *out, unsigned int out_len) {
     return libssh2_sftp_symlink_ex(sftp, path, (unsigned int)strlen(path), out, out_len, LIBSSH2_SFTP_REALPATH);
 }
 
-int macscp_sftp_readlink(LIBSSH2_SFTP *sftp, const char *path, char *out, unsigned int out_len) {
+int duckscp_sftp_readlink(LIBSSH2_SFTP *sftp, const char *path, char *out, unsigned int out_len) {
     return libssh2_sftp_symlink_ex(sftp, path, (unsigned int)strlen(path), out, out_len, LIBSSH2_SFTP_READLINK);
 }
 
-LIBSSH2_CHANNEL *macscp_channel_open_session(LIBSSH2_SESSION *s) {
+LIBSSH2_CHANNEL *duckscp_channel_open_session(LIBSSH2_SESSION *s) {
     return libssh2_channel_open_ex(s, "session", sizeof("session") - 1, LIBSSH2_CHANNEL_WINDOW_DEFAULT,
                                    LIBSSH2_CHANNEL_PACKET_DEFAULT, NULL, 0);
 }
 
-int macscp_channel_exec(LIBSSH2_CHANNEL *c, const char *command) {
+int duckscp_channel_exec(LIBSSH2_CHANNEL *c, const char *command) {
     return libssh2_channel_process_startup(c, "exec", sizeof("exec") - 1, command, (unsigned int)strlen(command));
 }
 
-ssize_t macscp_channel_read_stderr(LIBSSH2_CHANNEL *c, char *buf, size_t len) {
+ssize_t duckscp_channel_read_stderr(LIBSSH2_CHANNEL *c, char *buf, size_t len) {
     return libssh2_channel_read_ex(c, SSH_EXTENDED_DATA_STDERR, buf, len);
 }
 
-LIBSSH2_CHANNEL *macscp_scp_send(LIBSSH2_SESSION *s, const char *path, int mode, int64_t size, long mtime, long atime) {
+LIBSSH2_CHANNEL *duckscp_scp_send(LIBSSH2_SESSION *s, const char *path, int mode, int64_t size, long mtime, long atime) {
     return libssh2_scp_send64(s, path, mode, size, mtime, atime);
 }

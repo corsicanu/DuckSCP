@@ -4,11 +4,11 @@ import Testing
 
 /// Runs against the throwaway server from scripts/test_sshd.sh. Skipped when it is not running.
 private let sshDir: URL? = {
-    let dir = ProcessInfo.processInfo.environment["MACSCP_TEST_SSH_DIR"]
-        ?? (NSTemporaryDirectory() as NSString).appendingPathComponent("macscp-test-sshd")
+    let dir = ProcessInfo.processInfo.environment["DUCKSCP_TEST_SSH_DIR"]
+        ?? (NSTemporaryDirectory() as NSString).appendingPathComponent("duckscp-test-sshd")
     return FileManager.default.fileExists(atPath: dir + "/sshd.pid") ? URL(fileURLWithPath: dir) : nil
 }()
-private let sshPort = Int(ProcessInfo.processInfo.environment["MACSCP_TEST_SSH_PORT"] ?? "") ?? 2222
+private let sshPort = Int(ProcessInfo.processInfo.environment["DUCKSCP_TEST_SSH_PORT"] ?? "") ?? 2222
 
 final class TestPrompter: ConnectionPrompter {
     var hostKeyVerdicts: [HostKeyVerdict] = []

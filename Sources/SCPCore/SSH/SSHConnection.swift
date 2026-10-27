@@ -40,13 +40,13 @@ public final class SSHConnection {
             fd = try ProxyTunnel.open(site.proxy, password: settings.proxyPassword, host: site.hostName, port: site.port,
                                       timeout: timeout, family: family)
         } else {
-            fd = macscp_tcp_connect(site.hostName, Int32(site.port), Int32(timeout * 1000), family, &gaiError)
+            fd = duckscp_tcp_connect(site.hostName, Int32(site.port), Int32(timeout * 1000), family, &gaiError)
         }
         guard fd >= 0 else {
             if gaiError != 0 { throw FileSystemError(.connection, "Host \"\(site.hostName)\" does not exist.") }
             throw FileSystemError(.connection, "Network error: Connection to \"\(site.hostName)\" \(errno == ETIMEDOUT ? "timed out" : "refused").")
         }
-        guard let session = macscp_session_init() else {
+        guard let session = duckscp_session_init() else {
             Darwin.close(fd)
             throw FileSystemError(.connection, "Cannot initialize SSH session.")
         }
@@ -86,7 +86,7 @@ public final class SSHConnection {
 
     func error(_ fallback: String, code: FileSystemError.Code = .other) -> FileSystemError {
         var rc: Int32 = 0
-        let msg = String(cString: macscp_last_error(session, &rc))
+        let msg = String(cString: duckscp_last_error(session, &rc))
         if rc == LIBSSH2_ERROR_SOCKET_DISCONNECT || rc == LIBSSH2_ERROR_SOCKET_SEND || rc == LIBSSH2_ERROR_SOCKET_RECV
             || rc == LIBSSH2_ERROR_TIMEOUT {
             return FileSystemError(.connection, "Connection lost: \(msg.isEmpty ? fallback : msg)")
@@ -157,8 +157,8 @@ public final class SSHConnection {
             }
             guard let pw = current else { continue }
             prompter.status("Authenticating with password...")
-            if canKbd, macscp_userauth_kbdint(session, user, pw) == 0 { return }
-            if canPassword, macscp_userauth_password(session, user, pw) == 0 { return }
+            if canKbd, duckscp_userauth_kbdint(session, user, pw) == 0 { return }
+            if canPassword, duckscp_userauth_password(session, user, pw) == 0 { return }
         }
         throw FileSystemError(.authentication, "Access denied.")
     }
@@ -219,9 +219,9 @@ public final class SSHConnection {
 
     /// Runs a command and returns (exit status, stdout, stderr).
     func exec(_ command: String) throws -> (Int32, Data, String) {
-        guard let channel = macscp_channel_open_session(session) else { throw error("Cannot open channel", code: .connection) }
+        guard let channel = duckscp_channel_open_session(session) else { throw error("Cannot open channel", code: .connection) }
         defer { libssh2_channel_free(channel) }
-        guard macscp_channel_exec(channel, command) == 0 else { throw error("Cannot execute command") }
+        guard duckscp_channel_exec(channel, command) == 0 else { throw error("Cannot execute command") }
         var out = Data(), err = Data()
         var buf = [CChar](repeating: 0, count: 32 * 1024)
         while true {
@@ -231,7 +231,7 @@ public final class SSHConnection {
             break
         }
         while true {
-            let n = macscp_channel_read_stderr(channel, &buf, buf.count)
+            let n = duckscp_channel_read_stderr(channel, &buf, buf.count)
             if n > 0 { err.append(Data(bytes: buf, count: n)); continue }
             break
         }

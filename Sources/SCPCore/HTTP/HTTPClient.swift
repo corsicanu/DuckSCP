@@ -73,7 +73,7 @@ final class HTTPClient {
         var error: Error?
     }
 
-    private static let writeCB: macscp_io_cb = { ptr, size, n, user in
+    private static let writeCB: duckscp_io_cb = { ptr, size, n, user in
         let sink = Unmanaged<Sink>.fromOpaque(user!).takeUnretainedValue()
         let count = size * n
         let chunk = Data(bytes: ptr!, count: count)
@@ -87,7 +87,7 @@ final class HTTPClient {
         return count
     }
 
-    private static let readCB: macscp_io_cb = { ptr, size, n, user in
+    private static let readCB: duckscp_io_cb = { ptr, size, n, user in
         let sink = Unmanaged<Sink>.fromOpaque(user!).takeUnretainedValue()
         let max = size * n
         var chunk: Data
@@ -105,7 +105,7 @@ final class HTTPClient {
     }
 
     /// Rewinds the upload source (file or in-memory body) to `offset` from the start.
-    private static let seekCB: macscp_seek_cb = { user, offset, origin in
+    private static let seekCB: duckscp_seek_cb = { user, offset, origin in
         let sink = Unmanaged<Sink>.fromOpaque(user!).takeUnretainedValue()
         guard origin == SEEK_SET else { return Int32(CURL_SEEKFUNC_CANTSEEK) }
         if sink.inputData != nil {
@@ -117,7 +117,7 @@ final class HTTPClient {
         return Int32(CURL_SEEKFUNC_OK)
     }
 
-    private static let headerCB: macscp_io_cb = { ptr, size, n, user in
+    private static let headerCB: duckscp_io_cb = { ptr, size, n, user in
         let sink = Unmanaged<Sink>.fromOpaque(user!).takeUnretainedValue()
         let line = String(decoding: Data(bytes: ptr!, count: size * n), as: UTF8.self)
         if line.hasPrefix("HTTP/") { sink.headers.removeAll() } // keep only the final response's headers
@@ -145,60 +145,60 @@ final class HTTPClient {
 
     func perform(_ r: Request, what: String, path: String) throws -> Response {
         curl_easy_reset(curl)
-        macscp_curl_str(curl, CURLOPT_URL, r.url)
-        macscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
-        macscp_curl_long(curl, CURLOPT_LOW_SPEED_LIMIT, 1)
-        macscp_curl_long(curl, CURLOPT_LOW_SPEED_TIME, 60)
-        macscp_curl_long(curl, CURLOPT_NOSIGNAL, 1)
-        macscp_curl_ptr(curl, CURLOPT_ERRORBUFFER, errorBuffer)
+        duckscp_curl_str(curl, CURLOPT_URL, r.url)
+        duckscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
+        duckscp_curl_long(curl, CURLOPT_LOW_SPEED_LIMIT, 1)
+        duckscp_curl_long(curl, CURLOPT_LOW_SPEED_TIME, 60)
+        duckscp_curl_long(curl, CURLOPT_NOSIGNAL, 1)
+        duckscp_curl_ptr(curl, CURLOPT_ERRORBUFFER, errorBuffer)
         errorBuffer[0] = 0
         switch settings.ipVersion {
-        case .ipv4: macscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V4))
-        case .ipv6: macscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V6))
+        case .ipv4: duckscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V4))
+        case .ipv6: duckscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V6))
         case .auto: break
         }
         if let pin {
-            macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
-            macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
-            macscp_curl_str(curl, CURLOPT_PINNEDPUBLICKEY, pin)
+            duckscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
+            duckscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
+            duckscp_curl_str(curl, CURLOPT_PINNEDPUBLICKEY, pin)
         }
         if let proxy = site.proxy.curlURL {
-            macscp_curl_str(curl, CURLOPT_PROXY, proxy)
+            duckscp_curl_str(curl, CURLOPT_PROXY, proxy)
             if !site.proxy.user.isEmpty {
-                macscp_curl_str(curl, CURLOPT_PROXYUSERNAME, site.proxy.user)
-                macscp_curl_str(curl, CURLOPT_PROXYPASSWORD, settings.proxyPassword ?? "")
+                duckscp_curl_str(curl, CURLOPT_PROXYUSERNAME, site.proxy.user)
+                duckscp_curl_str(curl, CURLOPT_PROXYPASSWORD, settings.proxyPassword ?? "")
             }
-            if site.proxy.kind == .http { macscp_curl_long(curl, CURLOPT_HTTPPROXYTUNNEL, 1) }
+            if site.proxy.kind == .http { duckscp_curl_long(curl, CURLOPT_HTTPPROXYTUNNEL, 1) }
         }
         switch auth {
         case .none: break
         case .basicOrDigest(let user, let password):
-            macscp_curl_str(curl, CURLOPT_USERNAME, user)
-            macscp_curl_str(curl, CURLOPT_PASSWORD, password)
-            macscp_curl_long(curl, CURLOPT_HTTPAUTH, 1 | 2) // CURLAUTH_BASIC | CURLAUTH_DIGEST (macros Swift cannot import)
+            duckscp_curl_str(curl, CURLOPT_USERNAME, user)
+            duckscp_curl_str(curl, CURLOPT_PASSWORD, password)
+            duckscp_curl_long(curl, CURLOPT_HTTPAUTH, 1 | 2) // CURLAUTH_BASIC | CURLAUTH_DIGEST (macros Swift cannot import)
         case .sigV4(let provider, let key, let secret):
-            macscp_curl_str(curl, CURLOPT_AWS_SIGV4, provider)
-            macscp_curl_str(curl, CURLOPT_USERNAME, key)
-            macscp_curl_str(curl, CURLOPT_PASSWORD, secret)
+            duckscp_curl_str(curl, CURLOPT_AWS_SIGV4, provider)
+            duckscp_curl_str(curl, CURLOPT_USERNAME, key)
+            duckscp_curl_str(curl, CURLOPT_PASSWORD, secret)
         }
 
         var headers = r.headers
         if r.uploadFile != nil || r.body != nil {
             if r.method == "PUT" {
-                macscp_curl_long(curl, CURLOPT_UPLOAD, 1)
-                macscp_curl_off(curl, CURLOPT_INFILESIZE_LARGE, curl_off_t(r.uploadFile != nil ? r.uploadSize : UInt64(r.body!.count)))
+                duckscp_curl_long(curl, CURLOPT_UPLOAD, 1)
+                duckscp_curl_off(curl, CURLOPT_INFILESIZE_LARGE, curl_off_t(r.uploadFile != nil ? r.uploadSize : UInt64(r.body!.count)))
             } else {
-                macscp_curl_long(curl, CURLOPT_POST, 1)
-                macscp_curl_off(curl, CURLOPT_POSTFIELDSIZE_LARGE, curl_off_t(r.body?.count ?? 0))
-                macscp_curl_str(curl, CURLOPT_CUSTOMREQUEST, r.method)
+                duckscp_curl_long(curl, CURLOPT_POST, 1)
+                duckscp_curl_off(curl, CURLOPT_POSTFIELDSIZE_LARGE, curl_off_t(r.body?.count ?? 0))
+                duckscp_curl_str(curl, CURLOPT_CUSTOMREQUEST, r.method)
             }
             headers.append("Expect:") // no 100-continue round trip
         } else if r.noBody {
-            macscp_curl_long(curl, CURLOPT_NOBODY, 1)
+            duckscp_curl_long(curl, CURLOPT_NOBODY, 1)
         } else if r.method != "GET" {
-            macscp_curl_str(curl, CURLOPT_CUSTOMREQUEST, r.method)
+            duckscp_curl_str(curl, CURLOPT_CUSTOMREQUEST, r.method)
         }
-        if r.rangeFrom > 0 { macscp_curl_str(curl, CURLOPT_RANGE, "\(r.rangeFrom)-") }
+        if r.rangeFrom > 0 { duckscp_curl_str(curl, CURLOPT_RANGE, "\(r.rangeFrom)-") }
 
         var list: UnsafeMutablePointer<curl_slist>?
         for h in headers {
@@ -208,7 +208,7 @@ final class HTTPClient {
             list = curl_slist_append(list, h)
         }
         defer { curl_slist_free_all(list) }
-        if list != nil { macscp_curl_ptr(curl, CURLOPT_HTTPHEADER, list) }
+        if list != nil { duckscp_curl_ptr(curl, CURLOPT_HTTPHEADER, list) }
 
         let sink = Sink()
         sink.file = r.downloadTo
@@ -220,11 +220,11 @@ final class HTTPClient {
         sink.inputStart = (try? r.uploadFile?.offset()) ?? 0
         let ptr = Unmanaged.passRetained(sink).toOpaque()
         defer { Unmanaged<Sink>.fromOpaque(ptr).release() }
-        macscp_curl_write_cb(curl, Self.writeCB, ptr)
-        macscp_curl_read_cb(curl, Self.readCB, ptr)
-        macscp_curl_seek_cb(curl, Self.seekCB, ptr)
-        macscp_curl_ptr(curl, CURLOPT_HEADERFUNCTION, unsafeBitCast(Self.headerCB, to: UnsafeMutableRawPointer.self))
-        macscp_curl_ptr(curl, CURLOPT_HEADERDATA, ptr)
+        duckscp_curl_write_cb(curl, Self.writeCB, ptr)
+        duckscp_curl_read_cb(curl, Self.readCB, ptr)
+        duckscp_curl_seek_cb(curl, Self.seekCB, ptr)
+        duckscp_curl_ptr(curl, CURLOPT_HEADERFUNCTION, unsafeBitCast(Self.headerCB, to: UnsafeMutableRawPointer.self))
+        duckscp_curl_ptr(curl, CURLOPT_HEADERDATA, ptr)
 
         let rc = curl_easy_perform(curl)
         if let e = sink.error { throw e }
@@ -242,7 +242,7 @@ final class HTTPClient {
             }
         }
         var status = 0
-        macscp_curl_info_long(curl, CURLINFO_RESPONSE_CODE, &status)
+        duckscp_curl_info_long(curl, CURLINFO_RESPONSE_CODE, &status)
         return Response(status: status, headers: sink.headers, body: sink.data)
     }
 
@@ -263,16 +263,16 @@ final class HTTPClient {
     /// Fetches the server certificate without credentials and without trusting it.
     func probeCertificate() -> Data? {
         curl_easy_reset(curl)
-        macscp_curl_str(curl, CURLOPT_URL, baseURL + "/")
-        macscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
-        macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
-        macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
-        macscp_curl_long(curl, CURLOPT_CERTINFO, 1)
-        macscp_curl_long(curl, CURLOPT_NOBODY, 1)
-        if let proxy = site.proxy.curlURL { macscp_curl_str(curl, CURLOPT_PROXY, proxy) }
+        duckscp_curl_str(curl, CURLOPT_URL, baseURL + "/")
+        duckscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
+        duckscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
+        duckscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
+        duckscp_curl_long(curl, CURLOPT_CERTINFO, 1)
+        duckscp_curl_long(curl, CURLOPT_NOBODY, 1)
+        if let proxy = site.proxy.curlURL { duckscp_curl_str(curl, CURLOPT_PROXY, proxy) }
         _ = curl_easy_perform(curl)
         var buf = [CChar](repeating: 0, count: 256 * 1024)
-        guard macscp_curl_first_cert(curl, &buf, buf.count) > 0 else { return nil }
+        guard duckscp_curl_first_cert(curl, &buf, buf.count) > 0 else { return nil }
         return Certificate.firstDER(fromPEM: String(cString: buf))
     }
 

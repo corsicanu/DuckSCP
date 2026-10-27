@@ -45,13 +45,13 @@ public final class SFTPFileSystem: RemoteFileSystem {
 
     public func realPath(_ path: String) throws -> String {
         var buf = [CChar](repeating: 0, count: 4096)
-        let n = macscp_sftp_realpath(sftp, path, &buf, UInt32(buf.count))
+        let n = duckscp_sftp_realpath(sftp, path, &buf, UInt32(buf.count))
         guard n > 0 else { throw fail("Cannot resolve", path) }
         return String(decoding: buf.prefix(Int(n)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     public func list(_ path: String) throws -> [RemoteEntry] {
-        guard let handle = macscp_sftp_opendir(sftp, path) else { throw fail("Cannot open directory", path) }
+        guard let handle = duckscp_sftp_opendir(sftp, path) else { throw fail("Cannot open directory", path) }
         defer { libssh2_sftp_close_handle(handle) }
         var entries: [RemoteEntry] = []
         var name = [CChar](repeating: 0, count: 4096)
@@ -79,10 +79,10 @@ public final class SFTPFileSystem: RemoteFileSystem {
 
     private func resolveLink(_ e: inout RemoteEntry, _ full: String) {
         var target = [CChar](repeating: 0, count: 4096)
-        let n = macscp_sftp_readlink(sftp, full, &target, UInt32(target.count))
+        let n = duckscp_sftp_readlink(sftp, full, &target, UInt32(target.count))
         if n > 0 { e.linkTarget = String(decoding: target.prefix(Int(n)).map { UInt8(bitPattern: $0) }, as: UTF8.self) }
         var attrs = LIBSSH2_SFTP_ATTRIBUTES()
-        if macscp_sftp_stat(sftp, full, &attrs) == 0 {
+        if duckscp_sftp_stat(sftp, full, &attrs) == 0 {
             e.targetIsDirectory = UInt32(attrs.permissions) & UInt32(LIBSSH2_SFTP_S_IFMT) == UInt32(LIBSSH2_SFTP_S_IFDIR)
             if !e.targetIsDirectory { e.size = attrs.filesize }
         }
@@ -103,33 +103,33 @@ public final class SFTPFileSystem: RemoteFileSystem {
 
     public func stat(_ path: String) throws -> RemoteEntry {
         var attrs = LIBSSH2_SFTP_ATTRIBUTES()
-        guard macscp_sftp_lstat(sftp, path, &attrs) == 0 else { throw fail("Cannot get attributes of", path) }
+        guard duckscp_sftp_lstat(sftp, path, &attrs) == 0 else { throw fail("Cannot get attributes of", path) }
         var e = entry(RemotePath.name(path), attrs)
         if e.kind == .symlink { resolveLink(&e, path) }
         return e
     }
 
     public func makeDirectory(_ path: String) throws {
-        guard macscp_sftp_mkdir(sftp, path, 0o755) == 0 else { throw fail("Cannot create directory", path) }
+        guard duckscp_sftp_mkdir(sftp, path, 0o755) == 0 else { throw fail("Cannot create directory", path) }
     }
 
     public func removeFile(_ path: String) throws {
-        guard macscp_sftp_unlink(sftp, path) == 0 else { throw fail("Cannot delete", path) }
+        guard duckscp_sftp_unlink(sftp, path) == 0 else { throw fail("Cannot delete", path) }
     }
 
     public func removeDirectory(_ path: String) throws {
-        guard macscp_sftp_rmdir(sftp, path) == 0 else { throw fail("Cannot remove directory", path) }
+        guard duckscp_sftp_rmdir(sftp, path) == 0 else { throw fail("Cannot remove directory", path) }
     }
 
     public func rename(_ from: String, to: String) throws {
-        guard macscp_sftp_rename(sftp, from, to) == 0 else { throw fail("Cannot rename", from) }
+        guard duckscp_sftp_rename(sftp, from, to) == 0 else { throw fail("Cannot rename", from) }
     }
 
     public func setPermissions(_ path: String, _ mode: UInt32) throws {
         var attrs = LIBSSH2_SFTP_ATTRIBUTES()
         attrs.flags = UInt(LIBSSH2_SFTP_ATTR_PERMISSIONS)
         attrs.permissions = UInt(mode & 0o7777)
-        guard macscp_sftp_setstat(sftp, path, &attrs) == 0 else { throw fail("Cannot change permissions of", path) }
+        guard duckscp_sftp_setstat(sftp, path, &attrs) == 0 else { throw fail("Cannot change permissions of", path) }
     }
 
     public func setModificationDate(_ path: String, _ date: Date) throws {
@@ -137,11 +137,11 @@ public final class SFTPFileSystem: RemoteFileSystem {
         attrs.flags = UInt(LIBSSH2_SFTP_ATTR_ACMODTIME)
         attrs.mtime = UInt(max(0, date.timeIntervalSince1970))
         attrs.atime = attrs.mtime
-        guard macscp_sftp_setstat(sftp, path, &attrs) == 0 else { throw fail("Cannot set timestamp of", path) }
+        guard duckscp_sftp_setstat(sftp, path, &attrs) == 0 else { throw fail("Cannot set timestamp of", path) }
     }
 
     public func download(_ path: String, to local: URL, offset: UInt64, progress: (UInt64) -> Bool) throws {
-        guard let handle = macscp_sftp_open(sftp, path, UInt(LIBSSH2_FXF_READ), 0) else { throw fail("Cannot open", path) }
+        guard let handle = duckscp_sftp_open(sftp, path, UInt(LIBSSH2_FXF_READ), 0) else { throw fail("Cannot open", path) }
         defer { libssh2_sftp_close_handle(handle) }
         let out = try LocalFile.openForWriting(local, append: offset > 0)
         defer { try? out.close() }
@@ -165,7 +165,7 @@ public final class SFTPFileSystem: RemoteFileSystem {
         }
         defer { try? input.close() }
         let flags = LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | (offset > 0 ? 0 : LIBSSH2_FXF_TRUNC)
-        guard let handle = macscp_sftp_open(sftp, path, UInt(flags), 0o644) else { throw fail("Cannot create", path) }
+        guard let handle = duckscp_sftp_open(sftp, path, UInt(flags), 0o644) else { throw fail("Cannot create", path) }
         defer { libssh2_sftp_close_handle(handle) }
         try input.seek(toOffset: offset)
         libssh2_sftp_seek64(handle, offset)

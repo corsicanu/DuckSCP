@@ -31,9 +31,9 @@ private func check(_ fs: RemoteFileSystem, _ path: String, seconds limit: Double
         try check(LocalFileSystem(), dir.path, seconds: 10)
     }
 
-    @Test(.enabled(if: FileManager.default.fileExists(atPath: NSTemporaryDirectory() + "macscp-test-sshd/sshd.pid")))
+    @Test(.enabled(if: FileManager.default.fileExists(atPath: NSTemporaryDirectory() + "duckscp-test-sshd/sshd.pid")))
     func sftpAndScp() throws {
-        let sshDir = URL(fileURLWithPath: NSTemporaryDirectory() + "macscp-test-sshd")
+        let sshDir = URL(fileURLWithPath: NSTemporaryDirectory() + "duckscp-test-sshd")
         let dir = try makeBigDirectory(in: sshDir.appendingPathComponent("home"))
         defer { try? FileManager.default.removeItem(at: dir) }
         let hostKeys = HostKeyStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("hk-\(UUID()).json"), knownHostsFiles: [])
@@ -46,9 +46,9 @@ private func check(_ fs: RemoteFileSystem, _ path: String, seconds limit: Double
         }
     }
 
-    @Test(.enabled(if: FileManager.default.fileExists(atPath: NSTemporaryDirectory() + "macscp-test-ftpd/ftpd.pid")))
+    @Test(.enabled(if: FileManager.default.fileExists(atPath: NSTemporaryDirectory() + "duckscp-test-ftpd/ftpd.pid")))
     func ftp() throws {
-        let root = URL(fileURLWithPath: NSTemporaryDirectory() + "macscp-test-ftpd/root")
+        let root = URL(fileURLWithPath: NSTemporaryDirectory() + "duckscp-test-ftpd/root")
         let dir = try makeBigDirectory(in: root)
         defer { try? FileManager.default.removeItem(at: dir) }
         let site = Site(path: "f", fileProtocol: .ftp, hostName: "127.0.0.1", port: 2121, userName: "tester")

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import SCPCore
 
-private let httpd = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("macscp-test-httpd")
+private let httpd = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("duckscp-test-httpd")
 private let davUp = FileManager.default.fileExists(atPath: httpd.appendingPathComponent("dav.pid").path)
 private let s3Up = FileManager.default.fileExists(atPath: httpd.appendingPathComponent("s3.pid").path)
 
@@ -60,7 +60,7 @@ struct S3Tests {
 
     @Test func roundTripInsideBucket() throws {
         let fs = try connect()
-        let bucket = "/macscp-\(UUID().uuidString.lowercased().prefix(8))"
+        let bucket = "/duckscp-\(UUID().uuidString.lowercased().prefix(8))"
         try fs.makeDirectory(bucket)
         #expect(try fs.list("/").contains { $0.name == String(bucket.dropFirst()) && $0.kind == .directory })
         try exerciseFileSystem(fs, parent: bucket, attributes: false)
@@ -69,7 +69,7 @@ struct S3Tests {
 
     @Test func listsBeyondOnePage() throws {
         let fs = try connect()
-        let bucket = "/macscp-big-\(UUID().uuidString.lowercased().prefix(6))"
+        let bucket = "/duckscp-big-\(UUID().uuidString.lowercased().prefix(6))"
         try fs.makeDirectory(bucket)
         let empty = FileManager.default.temporaryDirectory.appendingPathComponent("empty-\(UUID())")
         try Data().write(to: empty)

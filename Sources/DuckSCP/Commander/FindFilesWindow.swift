@@ -4,8 +4,8 @@ import SCPCore
 /// WinSCP's Find Files dialog. Searches on its own connection so the panels stay usable.
 final class FindFilesWindow: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate {
     private let tab: SessionTab
-    private let rootField = MacSCP.textField(300)
-    private let maskField = MacSCP.textField(160)
+    private let rootField = DuckSCP.textField(300)
+    private let maskField = DuckSCP.textField(160)
     private let startButton = button("Start", nil, nil)
     private let status = label("")
     private let table = NSTableView()

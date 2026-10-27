@@ -4,8 +4,8 @@ import Testing
 
 /// Runs against scripts/test_ftpd.sh (pyftpdlib). Skipped when it is not running.
 private let ftpRunning: Bool = {
-    let dir = ProcessInfo.processInfo.environment["MACSCP_TEST_FTP_DIR"]
-        ?? (NSTemporaryDirectory() as NSString).appendingPathComponent("macscp-test-ftpd")
+    let dir = ProcessInfo.processInfo.environment["DUCKSCP_TEST_FTP_DIR"]
+        ?? (NSTemporaryDirectory() as NSString).appendingPathComponent("duckscp-test-ftpd")
     return FileManager.default.fileExists(atPath: dir + "/ftpd.pid")
 }()
 
@@ -77,7 +77,7 @@ struct FTPIntegrationTests {
     }
 }
 
-private let ftpdDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("macscp-test-ftpd")
+private let ftpdDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("duckscp-test-ftpd")
 
 private func openssl(_ args: [String]) throws -> Data {
     let p = Process()

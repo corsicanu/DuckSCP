@@ -3,15 +3,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source ./branding.env
-SCRATCH="${SCRATCH:-$HOME/Library/Caches/MacSCP-build}"
+SCRATCH="${SCRATCH:-$HOME/Library/Caches/DuckSCP-build}"
 
 swift build -c release --scratch-path "$SCRATCH" 2>&1 | grep -v "ld: warning: search path"
-BIN="$(swift build -c release --scratch-path "$SCRATCH" --show-bin-path)/MacSCP"
+BIN="$(swift build -c release --scratch-path "$SCRATCH" --show-bin-path)/DuckSCP"
 
 APP="build/$APP_NAME.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+# App icon from branding/AppIcon.iconset (regenerate with tools/make_icon.py).
+iconutil -c icns branding/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -24,6 +26,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$APP_VERSION</string>
   <key>CFBundleVersion</key><string>$(git rev-list --count HEAD 2>/dev/null || echo 0)</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>LegacyAppName</key><string>${LEGACY_APP_NAME:-}</string>
+  <key>LegacyBundleID</key><string>${LEGACY_BUNDLE_ID:-}</string>
   <key>NSHumanReadableCopyright</key><string>$COPYRIGHT</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
@@ -39,6 +44,8 @@ echo "Built $APP"
 if [[ "${1:-}" == "--install" ]]; then
   mkdir -p "$HOME/Applications"
   rm -rf "$HOME/Applications/$APP_NAME.app"
+  # Remove a copy installed under the previous product name.
+  [[ -n "${LEGACY_APP_NAME:-}" ]] && rm -rf "$HOME/Applications/$LEGACY_APP_NAME.app"
   cp -R "$APP" "$HOME/Applications/"
   echo "Installed to ~/Applications/$APP_NAME.app"
 fi

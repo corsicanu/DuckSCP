@@ -11,10 +11,10 @@ let staticSSH: [LinkerSetting] = [
 ]
 
 let package = Package(
-    name: "MacSCP",
+    name: "DuckSCP",
     platforms: [.macOS(.v13)],
     products: [
-        .executable(name: "MacSCP", targets: ["MacSCP"]),
+        .executable(name: "DuckSCP", targets: ["DuckSCP"]),
         .library(name: "SCPCore", targets: ["SCPCore"]),
     ],
     targets: [
@@ -22,7 +22,7 @@ let package = Package(
         // System libcurl (SecureTransport TLS, macOS trust store) for FTP/FTPS.
         .target(name: "CCurl", path: "Sources/CCurl", linkerSettings: [.linkedLibrary("curl")]),
         .target(name: "SCPCore", dependencies: ["CLibSSH2", "CCurl"], path: "Sources/SCPCore"),
-        .executableTarget(name: "MacSCP", dependencies: ["SCPCore"], path: "Sources/MacSCP"),
+        .executableTarget(name: "DuckSCP", dependencies: ["SCPCore"], path: "Sources/DuckSCP"),
         .testTarget(name: "SCPCoreTests", dependencies: ["SCPCore"], path: "Tests/SCPCoreTests",
                     resources: [.copy("Fixtures")]),
     ],

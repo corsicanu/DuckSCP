@@ -4,7 +4,7 @@
 # Needs network once to install pyftpdlib into a private venv.
 # Usage: scripts/test_ftpd.sh start|stop
 set -euo pipefail
-DIR="${FTPD_DIR:-${TMPDIR:-/tmp}/macscp-test-ftpd}"
+DIR="${FTPD_DIR:-${TMPDIR:-/tmp}/duckscp-test-ftpd}"
 PORT="${PORT:-2121}"
 TOOLS="$(cd "$(dirname "$0")/../tools" && pwd)"
 case "${1:-start}" in

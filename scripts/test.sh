@@ -4,7 +4,7 @@
 # Builds outside the repo because ~/Desktop may carry Finder xattrs that break codesign.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-SCRATCH="${SCRATCH:-$HOME/Library/Caches/MacSCP-build}"
+SCRATCH="${SCRATCH:-$HOME/Library/Caches/DuckSCP-build}"
 CLT=/Library/Developer/CommandLineTools
 ARGS=(--scratch-path "$SCRATCH")
 if [[ -d $CLT/usr/lib/swift/host/plugins/testing ]] && ! xcode-select -p | grep -q Xcode.app; then

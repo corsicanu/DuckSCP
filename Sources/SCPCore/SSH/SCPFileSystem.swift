@@ -102,7 +102,7 @@ public final class SCPFileSystem: RemoteFileSystem {
         let mtime = Int((attrs[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0)
         let input = try FileHandle(forReadingFrom: local)
         defer { try? input.close() }
-        guard let channel = macscp_scp_send(conn.session, path, mode, size, mtime, mtime) else {
+        guard let channel = duckscp_scp_send(conn.session, path, mode, size, mtime, mtime) else {
             throw conn.error("Cannot upload to \(path)")
         }
         defer { libssh2_channel_free(channel) }

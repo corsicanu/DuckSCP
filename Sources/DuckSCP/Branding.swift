@@ -10,9 +10,9 @@ var currentPrefs: Preferences {
 
 enum Branding {
     static var appName: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "MacSCP"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "DuckSCP"
     }
-    static var bundleID: String { Bundle.main.bundleIdentifier ?? "local.macscp" }
+    static var bundleID: String { Bundle.main.bundleIdentifier ?? "local.duckscp" }
     static var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }

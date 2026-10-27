@@ -3,7 +3,7 @@
 # for integration tests. Key-based login only. State lives in $DIR (default: a temp dir).
 # Usage: scripts/test_sshd.sh start|stop|env
 set -euo pipefail
-DIR="${SSHD_DIR:-${TMPDIR:-/tmp}/macscp-test-sshd}"
+DIR="${SSHD_DIR:-${TMPDIR:-/tmp}/duckscp-test-sshd}"
 PORT="${PORT:-2222}"
 case "${1:-start}" in
   start)
@@ -42,6 +42,6 @@ CFG
     [[ -f $DIR/sshd.pid ]] && kill "$(cat $DIR/sshd.pid)" && rm -f "$DIR/sshd.pid"
     ;;
   env)
-    echo "MACSCP_TEST_SSH_DIR=$DIR MACSCP_TEST_SSH_PORT=$PORT"
+    echo "DUCKSCP_TEST_SSH_DIR=$DIR DUCKSCP_TEST_SSH_PORT=$PORT"
     ;;
 esac

@@ -5,7 +5,7 @@ import SCPCore
 final class PropertiesSheet: NSWindowController, NSTextFieldDelegate {
     var onApply: ((UInt32) -> Void)?
     private var boxes: [NSButton] = []
-    private let octal = MacSCP.textField(60) // qualified: NSTextFieldDelegate has textField(_:…) members
+    private let octal = DuckSCP.textField(60) // qualified: NSTextFieldDelegate has textField(_:…) members
     private let original: UInt32?
     private static let bits: [UInt32] = [0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001]
 

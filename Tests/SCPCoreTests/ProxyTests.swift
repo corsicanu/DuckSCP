@@ -3,9 +3,9 @@ import Testing
 @testable import SCPCore
 
 private let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-private let proxyLog = tmp.appendingPathComponent("macscp-test-ftpd/proxy.log")
-private let proxyUp = FileManager.default.fileExists(atPath: tmp.appendingPathComponent("macscp-test-ftpd/proxy.pid").path)
-private let sshUp = FileManager.default.fileExists(atPath: tmp.appendingPathComponent("macscp-test-sshd/sshd.pid").path)
+private let proxyLog = tmp.appendingPathComponent("duckscp-test-ftpd/proxy.log")
+private let proxyUp = FileManager.default.fileExists(atPath: tmp.appendingPathComponent("duckscp-test-ftpd/proxy.pid").path)
+private let sshUp = FileManager.default.fileExists(atPath: tmp.appendingPathComponent("duckscp-test-sshd/sshd.pid").path)
 
 private func proxy(_ kind: ProxySettings.Kind, auth: Bool) -> ProxySettings {
     var p = ProxySettings()
@@ -32,7 +32,7 @@ struct ProxyTests {
 
     func sshSite(_ p: ProxySettings) -> Site {
         var s = Site(path: "p", fileProtocol: .sftp, allowScpFallback: false, hostName: "127.0.0.1", port: 2222, userName: NSUserName(),
-                     privateKeyPath: tmp.appendingPathComponent("macscp-test-sshd/id_ed25519").path)
+                     privateKeyPath: tmp.appendingPathComponent("duckscp-test-sshd/id_ed25519").path)
         s.proxy = p
         return s
     }

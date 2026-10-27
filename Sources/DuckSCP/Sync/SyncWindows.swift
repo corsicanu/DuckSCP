@@ -21,7 +21,7 @@ final class SynchronizeController: NSObject, NSTableViewDataSource, NSTableViewD
     func start(completion: @escaping () -> Void) {
         self.completion = completion
         guard let window = commander.window else { return }
-        let localField = MacSCP.textField(380), remoteField = MacSCP.textField(380)
+        let localField = DuckSCP.textField(380), remoteField = DuckSCP.textField(380)
         localField.stringValue = tab.local.path
         remoteField.stringValue = tab.remote.path
         let direction = NSSegmentedControl(labels: ["Both", "Remote", "Local"], trackingMode: .selectOne, target: nil, action: nil)
@@ -200,8 +200,8 @@ final class SynchronizeController: NSObject, NSTableViewDataSource, NSTableViewD
 /// and uploads changes (optionally deleting remote files that were removed locally).
 final class KeepUpToDateWindow: NSWindowController, NSWindowDelegate {
     private let tab: SessionTab
-    private let localField = MacSCP.textField(420)
-    private let remoteField = MacSCP.textField(420)
+    private let localField = DuckSCP.textField(420)
+    private let remoteField = DuckSCP.textField(420)
     private let deleteBox = NSButton(checkboxWithTitle: "Delete remote files removed locally", target: nil, action: nil)
     private let initialBox = NSButton(checkboxWithTitle: "Synchronize on start", target: nil, action: nil)
     private let startButton = button("Start", nil, nil)

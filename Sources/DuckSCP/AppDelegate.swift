@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
         RemoteEditSession.removeStaleCopies()
+        if !args.contains("--data-dir") && !args.contains("--snapshot") { LegacyMigration.run() }
         let snapshotDir = value(after: "--snapshot", in: args)
         let dataDir = value(after: "--data-dir", in: args)
 
@@ -58,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             attach(RemoteSession(site: site, fs: LocalFileSystem()) { LocalFileSystem() })
             if let tab = commander?.current {
                 // Show the queue with one finished demo transfer.
-                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("macscp-demo-\(UUID().uuidString)")
+                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("duckscp-demo-\(UUID().uuidString)")
                 try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
                 let file = tmp.appendingPathComponent("demo.bin")
                 try? Data(count: 300_000).write(to: file)

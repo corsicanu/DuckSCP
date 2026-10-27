@@ -3,8 +3,8 @@
 # servers for integration tests. Uses the venv created by scripts/test_ftpd.sh (needs network once).
 # Usage: scripts/test_httpd.sh start|stop
 set -euo pipefail
-DIR="${HTTPD_DIR:-${TMPDIR:-/tmp}/macscp-test-httpd}"
-VENV="${FTPD_DIR:-${TMPDIR:-/tmp}/macscp-test-ftpd}/venv"
+DIR="${HTTPD_DIR:-${TMPDIR:-/tmp}/duckscp-test-httpd}"
+VENV="${FTPD_DIR:-${TMPDIR:-/tmp}/duckscp-test-ftpd}/venv"
 case "${1:-start}" in
   start)
     mkdir -p "$DIR/dav"

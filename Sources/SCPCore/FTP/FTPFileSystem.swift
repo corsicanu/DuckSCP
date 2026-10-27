@@ -114,40 +114,40 @@ public final class FTPFileSystem: RemoteFileSystem {
 
     private func reset(_ url: String) {
         curl_easy_reset(curl)
-        macscp_curl_str(curl, CURLOPT_URL, url)
-        macscp_curl_str(curl, CURLOPT_USERNAME, user)
-        macscp_curl_str(curl, CURLOPT_PASSWORD, password)
-        macscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
+        duckscp_curl_str(curl, CURLOPT_URL, url)
+        duckscp_curl_str(curl, CURLOPT_USERNAME, user)
+        duckscp_curl_str(curl, CURLOPT_PASSWORD, password)
+        duckscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
         switch settings.ipVersion {
-        case .ipv4: macscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V4))
-        case .ipv6: macscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V6))
+        case .ipv4: duckscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V4))
+        case .ipv6: duckscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V6))
         case .auto: break
         }
         // Abort stalled transfers: under 1 byte/s for 60 s.
-        macscp_curl_long(curl, CURLOPT_LOW_SPEED_LIMIT, 1)
-        macscp_curl_long(curl, CURLOPT_LOW_SPEED_TIME, 60)
-        macscp_curl_long(curl, CURLOPT_NOSIGNAL, 1)
-        macscp_curl_ptr(curl, CURLOPT_ERRORBUFFER, errorBuffer)
+        duckscp_curl_long(curl, CURLOPT_LOW_SPEED_LIMIT, 1)
+        duckscp_curl_long(curl, CURLOPT_LOW_SPEED_TIME, 60)
+        duckscp_curl_long(curl, CURLOPT_NOSIGNAL, 1)
+        duckscp_curl_ptr(curl, CURLOPT_ERRORBUFFER, errorBuffer)
         if site.ftpEncryption == .explicitTLS {
-            macscp_curl_long(curl, CURLOPT_USE_SSL, Int(CURLUSESSL_ALL.rawValue))
+            duckscp_curl_long(curl, CURLOPT_USE_SSL, Int(CURLUSESSL_ALL.rawValue))
         }
         if let pin {
-            macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
-            macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
-            macscp_curl_str(curl, CURLOPT_PINNEDPUBLICKEY, pin)
+            duckscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
+            duckscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
+            duckscp_curl_str(curl, CURLOPT_PINNEDPUBLICKEY, pin)
         } else {
-            macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 1)
-            macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 2)
+            duckscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 1)
+            duckscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 2)
         }
-        if !site.ftpPassive { macscp_curl_str(curl, CURLOPT_FTPPORT, "-") }
+        if !site.ftpPassive { duckscp_curl_str(curl, CURLOPT_FTPPORT, "-") }
         if let proxy = site.proxy.curlURL {
-            macscp_curl_str(curl, CURLOPT_PROXY, proxy)
+            duckscp_curl_str(curl, CURLOPT_PROXY, proxy)
             if !site.proxy.user.isEmpty {
-                macscp_curl_str(curl, CURLOPT_PROXYUSERNAME, site.proxy.user)
-                macscp_curl_str(curl, CURLOPT_PROXYPASSWORD, settings.proxyPassword ?? "")
+                duckscp_curl_str(curl, CURLOPT_PROXYUSERNAME, site.proxy.user)
+                duckscp_curl_str(curl, CURLOPT_PROXYPASSWORD, settings.proxyPassword ?? "")
             }
             // FTP over an HTTP proxy only works as a CONNECT tunnel (control and data).
-            if site.proxy.kind == .http { macscp_curl_long(curl, CURLOPT_HTTPPROXYTUNNEL, 1) }
+            if site.proxy.kind == .http { duckscp_curl_long(curl, CURLOPT_HTTPPROXYTUNNEL, 1) }
         }
         errorBuffer[0] = 0
     }
@@ -156,7 +156,7 @@ public final class FTPFileSystem: RemoteFileSystem {
         let rc = curl_easy_perform(curl)
         guard rc != CURLE_OK else { return }
         var response = 0
-        macscp_curl_info_long(curl, CURLINFO_RESPONSE_CODE, &response)
+        duckscp_curl_info_long(curl, CURLINFO_RESPONSE_CODE, &response)
         let detail = errorBuffer[0] != 0 ? String(cString: errorBuffer) : String(cString: curl_easy_strerror(rc))
         let message = "\(what) \(path) failed: \(detail)"
         switch rc {
@@ -192,8 +192,8 @@ public final class FTPFileSystem: RemoteFileSystem {
             list = curl_slist_append(list, c)
         }
         defer { curl_slist_free_all(list) }
-        macscp_curl_ptr(curl, CURLOPT_QUOTE, list)
-        macscp_curl_long(curl, CURLOPT_NOBODY, 1)
+        duckscp_curl_ptr(curl, CURLOPT_QUOTE, list)
+        duckscp_curl_long(curl, CURLOPT_NOBODY, 1)
         try perform(what, path)
     }
 
@@ -208,7 +208,7 @@ public final class FTPFileSystem: RemoteFileSystem {
         var error: Error?
     }
 
-    private static let writeCB: macscp_io_cb = { ptr, size, n, user in
+    private static let writeCB: duckscp_io_cb = { ptr, size, n, user in
         let sink = Unmanaged<Sink>.fromOpaque(user!).takeUnretainedValue()
         let count = size * n
         let chunk = Data(bytes: ptr!, count: count)
@@ -222,7 +222,7 @@ public final class FTPFileSystem: RemoteFileSystem {
         return count
     }
 
-    private static let readCB: macscp_io_cb = { ptr, size, n, user in
+    private static let readCB: duckscp_io_cb = { ptr, size, n, user in
         let sink = Unmanaged<Sink>.fromOpaque(user!).takeUnretainedValue()
         guard let chunk = try? sink.input?.read(upToCount: size * n), !chunk.isEmpty else { return 0 }
         chunk.copyBytes(to: UnsafeMutableRawPointer(ptr!).assumingMemoryBound(to: UInt8.self), count: chunk.count)
@@ -240,13 +240,13 @@ public final class FTPFileSystem: RemoteFileSystem {
     /// Fetches the server certificate without trusting it and without real credentials.
     func probeCertificate() -> Data? {
         reset(baseURL + "/")
-        macscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
-        macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
-        macscp_curl_long(curl, CURLOPT_CERTINFO, 1)
-        macscp_curl_long(curl, CURLOPT_NOBODY, 1)
+        duckscp_curl_long(curl, CURLOPT_SSL_VERIFYPEER, 0)
+        duckscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 0)
+        duckscp_curl_long(curl, CURLOPT_CERTINFO, 1)
+        duckscp_curl_long(curl, CURLOPT_NOBODY, 1)
         _ = curl_easy_perform(curl) // login may fail; the TLS handshake has happened by then
         var buf = [CChar](repeating: 0, count: 256 * 1024)
-        guard macscp_curl_first_cert(curl, &buf, buf.count) > 0 else { return nil }
+        guard duckscp_curl_first_cert(curl, &buf, buf.count) > 0 else { return nil }
         return Certificate.firstDER(fromPEM: String(cString: buf))
     }
 
@@ -254,10 +254,10 @@ public final class FTPFileSystem: RemoteFileSystem {
 
     public func homeDirectory() throws -> String {
         reset(baseURL + "/")
-        macscp_curl_long(curl, CURLOPT_NOBODY, 1)
+        duckscp_curl_long(curl, CURLOPT_NOBODY, 1)
         try perform("Connecting to", site.hostName)
         var path: UnsafePointer<CChar>?
-        macscp_curl_info_str(curl, CURLINFO_FTP_ENTRY_PATH, &path)
+        duckscp_curl_info_str(curl, CURLINFO_FTP_ENTRY_PATH, &path)
         return path.map { String(cString: $0) } ?? "/"
     }
 
@@ -265,10 +265,10 @@ public final class FTPFileSystem: RemoteFileSystem {
         while true {
             let sink = Sink()
             reset(url(path, directory: true))
-            macscp_curl_str(curl, CURLOPT_CUSTOMREQUEST, listCommand)
+            duckscp_curl_str(curl, CURLOPT_CUSTOMREQUEST, listCommand)
             do {
                 try withSink(sink) { ptr in
-                    macscp_curl_write_cb(curl, Self.writeCB, ptr)
+                    duckscp_curl_write_cb(curl, Self.writeCB, ptr)
                     try perform("Listing directory", path)
                 }
             } catch let e as FileSystemError where e.code == .other && listCommand != "LIST" {
@@ -316,9 +316,9 @@ public final class FTPFileSystem: RemoteFileSystem {
             sink.total = offset
             sink.progress = progress
             reset(url(path))
-            if offset > 0 { macscp_curl_off(curl, CURLOPT_RESUME_FROM_LARGE, curl_off_t(offset)) }
+            if offset > 0 { duckscp_curl_off(curl, CURLOPT_RESUME_FROM_LARGE, curl_off_t(offset)) }
             try withSink(sink) { ptr in
-                macscp_curl_write_cb(curl, Self.writeCB, ptr)
+                duckscp_curl_write_cb(curl, Self.writeCB, ptr)
                 do { try perform("Downloading", path) } catch {
                     throw sink.error ?? error
                 }
@@ -340,11 +340,11 @@ public final class FTPFileSystem: RemoteFileSystem {
             sink.total = offset
             sink.progress = progress
             reset(url(path))
-            macscp_curl_long(curl, CURLOPT_UPLOAD, 1)
-            macscp_curl_off(curl, CURLOPT_INFILESIZE_LARGE, curl_off_t(size - offset))
-            if offset > 0 { macscp_curl_long(curl, CURLOPT_APPEND, 1) }
+            duckscp_curl_long(curl, CURLOPT_UPLOAD, 1)
+            duckscp_curl_off(curl, CURLOPT_INFILESIZE_LARGE, curl_off_t(size - offset))
+            if offset > 0 { duckscp_curl_long(curl, CURLOPT_APPEND, 1) }
             try withSink(sink) { ptr in
-                macscp_curl_read_cb(curl, Self.readCB, ptr)
+                duckscp_curl_read_cb(curl, Self.readCB, ptr)
                 try perform("Uploading", path)
             }
         }

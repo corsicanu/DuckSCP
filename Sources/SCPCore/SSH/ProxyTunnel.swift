@@ -7,7 +7,7 @@ public enum ProxyTunnel {
     public static func open(_ proxy: ProxySettings, password: String?, host: String, port: Int,
                             timeout: TimeInterval, family: Int32) throws -> Int32 {
         var gai: Int32 = 0
-        let fd = macscp_tcp_connect(proxy.host, Int32(proxy.port), Int32(timeout * 1000), family, &gai)
+        let fd = duckscp_tcp_connect(proxy.host, Int32(proxy.port), Int32(timeout * 1000), family, &gai)
         guard fd >= 0 else {
             throw FileSystemError(.connection, gai != 0 ? "Proxy host \"\(proxy.host)\" does not exist."
                                                         : "Cannot connect to proxy \(proxy.host):\(proxy.port).")
