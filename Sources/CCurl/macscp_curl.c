@@ -17,6 +17,11 @@ CURLcode macscp_curl_read_cb(CURL *h, macscp_io_cb cb, void *userdata) {
     return rc ? rc : curl_easy_setopt(h, CURLOPT_READDATA, userdata);
 }
 
+CURLcode macscp_curl_seek_cb(CURL *h, macscp_seek_cb cb, void *userdata) {
+    CURLcode rc = curl_easy_setopt(h, CURLOPT_SEEKFUNCTION, cb);
+    return rc ? rc : curl_easy_setopt(h, CURLOPT_SEEKDATA, userdata);
+}
+
 CURLcode macscp_curl_progress_cb(CURL *h, macscp_progress_cb cb, void *userdata) {
     CURLcode rc = curl_easy_setopt(h, CURLOPT_XFERINFOFUNCTION, cb);
     if (!rc) rc = curl_easy_setopt(h, CURLOPT_XFERINFODATA, userdata);

@@ -73,7 +73,7 @@ private func fixture() throws -> Data {
         let local = try site("localhost test")
         #expect(local.fileProtocol == .sftp && local.allowScpFallback && local.port == 2222)
 
-        #expect(try !site("webdav box").fileProtocol.isSupported)
+        #expect(try site("webdav box").fileProtocol == .webdav)
         #expect(try site("s3 bucket").fileProtocol == .s3)
     }
 

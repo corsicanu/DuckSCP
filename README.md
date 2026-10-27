@@ -15,6 +15,7 @@ It imports your existing `WinSCP.ini` sites, including saved passwords.
 | 3 | SFTP / SCP (libssh2): host-key checks, passwords, OpenSSH + PuTTY keys, ssh-agent | ✅ |
 | 4 | Transfer queue on a second connection, progress dialog, overwrite prompts, resume | ✅ |
 | 5 | FTP / FTPS (implicit and explicit TLS, passive and active) over system libcurl | ✅ |
+| 6 | WebDAV (HTTP/HTTPS, Basic/Digest) and Amazon S3 / S3-compatible (SigV4) | ✅ |
 
 ## Build and run
 
@@ -42,6 +43,12 @@ For the FTP/FTPS tests, start a throwaway pyftpdlib server (`127.0.0.1:2121`, us
 scripts/test_ftpd.sh start
 ```
 
+For WebDAV (WsgiDAV, `127.0.0.1:2180`) and S3 (moto, `127.0.0.1:2190`):
+
+```bash
+scripts/test_httpd.sh start
+```
+
 Without these servers, the integration tests are skipped.
 
 ## Importing WinSCP.ini
@@ -50,7 +57,7 @@ Without these servers, the integration tests are skipped.
 2. Copy it to the Mac.
 3. In MacSCP's Login window: **Tools ▾ → Import Sites from WinSCP.ini…**
 
-What is imported, per site: folder path, protocol (SFTP/SCP/FTP; WebDAV and S3 are listed but cannot connect yet), host, port, user, password, FTP encryption and passive mode, private key path, remote directory, note, colour.
+What is imported, per site: folder path, protocol (SFTP, SCP, FTP, WebDAV, S3), host, port, user, password, FTP encryption and passive mode, private key path, remote directory, note, colour.
 
 What needs attention afterwards (marked ⚠︎ in the site tree):
 - **Windows paths.** Local directories like `C:\…` are dropped. Key files are looked up by file name in `~/.ssh`; if missing, pick them in **Advanced…**.
@@ -126,6 +133,9 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - **Keys:** OpenSSH and PEM keys, encrypted or not. PuTTY `.ppk` v2 and v3 unencrypted, and v2 encrypted. Encrypted v3 `.ppk` files use Argon2; convert those with PuTTYgen → Conversions → Export OpenSSH key.
 - **SCP mode** runs `ls`, `mv`, `rm`, `chmod` and `touch` on the server, so it needs a POSIX shell, like WinSCP's SCP mode. Listings use `TZ=UTC` and the most precise date format the server's `ls` supports.
 - **FTP/FTPS** uses the system libcurl with macOS's trust store. Listings use MLSD, then fall back to `LIST -a` and `LIST` (Unix and Windows/IIS formats). A certificate macOS doesn't trust (self-signed, for example) is first fetched with an anonymous probe, so your password is never sent to an unverified server. You then see its SHA-256 fingerprint and choose *Accept and Remember*, *Connect Once* or *Cancel*. An accepted certificate's public key is pinned (`CURLOPT_PINNEDPUBLICKEY`), so a different certificate later triggers the "POTENTIAL SECURITY BREACH" warning.
+- **WebDAV:** Encryption = TLS means HTTPS. Downloads resume with HTTP Range. Uploads restart, because a plain PUT cannot append. There are no permissions; folder rename uses MOVE.
+- **S3:** user name = access key ID, password = secret access key, and the region is under Advanced (default `us-east-1`). Path-style addressing works with AWS and S3-compatible servers (MinIO, Wasabi, R2…). `/` lists buckets and folders are `/` prefixes. Listings page past 1,000 objects. Files are renamed by server-side copy plus delete. Single uploads are limited to 5 GB (no multipart yet).
+- HTTPS for WebDAV/S3 uses the same certificate pinning flow as FTPS.
 - **Host keys** are checked against MacSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
 
 ## Large directories
@@ -149,7 +159,6 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 ## Known limitations
 
-- **Not yet built:** WebDAV, S3.
 - **Master password** decryption follows WinSCP's AES format (WinZip-AES / fcrypt). It is verified against an independent Python implementation, not yet against a file from WinSCP itself. Every password is MAC-checked, so it either decrypts correctly or is reported as failed.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).
 

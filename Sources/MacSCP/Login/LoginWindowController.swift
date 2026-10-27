@@ -77,7 +77,6 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         // Session group
         for p in FileProtocol.allCases {
             protocolPopup.addItem(withTitle: p.title)
-            protocolPopup.lastItem?.isEnabled = p.isSupported
         }
         protocolPopup.autoenablesItems = false
         protocolPopup.target = self
@@ -276,7 +275,6 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             let site = store.site(id)
             image.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: nil)
             if let c = site?.color { image.contentTintColor = NSColor(winscpColor: c) }
-            if site?.fileProtocol.isSupported == false { text.textColor = .secondaryLabelColor }
             if site?.importWarnings.isEmpty == false { text.stringValue += " ⚠︎" }
         }
         cell.addSubview(image)
@@ -344,14 +342,23 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     }
 
     private func updateEncryptionVisibility() {
-        let ftp = FileProtocol.allCases[max(0, protocolPopup.indexOfSelectedItem)] == .ftp
-        encryptionLabel.isHidden = !ftp
-        encryptionPopup.isHidden = !ftp
+        let proto = FileProtocol.allCases[max(0, protocolPopup.indexOfSelectedItem)]
+        encryptionLabel.isHidden = !proto.hasEncryptionChoice
+        encryptionPopup.isHidden = !proto.hasEncryptionChoice
     }
 
     @objc private func protocolChanged() {
         let oldDefault = Site.defaultPort(draft.fileProtocol, draft.ftpEncryption)
+        let oldProtocol = draft.fileProtocol
         readFields()
+        // Like WinSCP: a new S3 session points at AWS over TLS.
+        if draft.fileProtocol == .s3 && oldProtocol != .s3 {
+            if draft.hostName.isEmpty { draft.hostName = "s3.amazonaws.com"; hostField.stringValue = draft.hostName }
+            if draft.ftpEncryption == .none {
+                draft.ftpEncryption = .implicitTLS
+                encryptionPopup.selectItem(at: FtpEncryption.allCases.firstIndex(of: .implicitTLS) ?? 0)
+            }
+        }
         if Int(portField.stringValue) == oldDefault {
             draft.port = Site.defaultPort(draft.fileProtocol, draft.ftpEncryption)
             portField.stringValue = String(draft.port)
@@ -372,12 +379,6 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         guard !draft.hostName.isEmpty else {
             NSSound.beep()
             window?.makeFirstResponder(hostField)
-            return
-        }
-        guard draft.fileProtocol.isSupported else {
-            let a = NSAlert()
-            a.messageText = "\(draft.fileProtocol.title) is not supported yet."
-            a.beginSheetModal(for: window!)
             return
         }
         var password: String? = passwordField.stringValue.isEmpty ? nil : passwordField.stringValue

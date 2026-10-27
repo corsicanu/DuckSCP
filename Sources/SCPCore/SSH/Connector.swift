@@ -36,8 +36,10 @@ public enum Connector {
             return SCPFileSystem(connection: conn)
         case .ftp:
             return try FTPFileSystem.connect(site: site, password: password, prompter: prompter, settings: settings, hostKeys: hostKeys)
-        case .webdav, .s3:
-            throw FileSystemError(.unsupported, "\(site.fileProtocol.title) is not supported yet.")
+        case .webdav:
+            return try WebDAVFileSystem.connect(site: site, password: password, prompter: prompter, settings: settings, hostKeys: hostKeys)
+        case .s3:
+            return try S3FileSystem.connect(site: site, password: password, prompter: prompter, settings: settings, hostKeys: hostKeys)
         }
     }
 }

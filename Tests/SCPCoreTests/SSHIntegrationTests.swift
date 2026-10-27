@@ -37,7 +37,7 @@ final class TestPrompter: ConnectionPrompter {
 }
 
 /// Exercises every RemoteFileSystem operation inside a fresh folder under `parent`.
-func exerciseFileSystem(_ fs: RemoteFileSystem, parent: String, expectOwner: String? = nil) throws {
+func exerciseFileSystem(_ fs: RemoteFileSystem, parent: String, expectOwner: String? = nil, attributes: Bool = true) throws {
     let base = RemotePath.join(parent, UUID().uuidString)
     try fs.makeDirectory(base)
     defer { try? RecursiveOps.delete(base, entry: RemoteEntry(name: "", kind: .directory), fs: fs) }
@@ -53,12 +53,18 @@ func exerciseFileSystem(_ fs: RemoteFileSystem, parent: String, expectOwner: Str
     if let expectOwner { #expect(listed.first?.owner == expectOwner) }
 
     try fs.rename(base + "/it's a #file.bin", to: base + "/b.bin")
-    try fs.setPermissions(base + "/b.bin", 0o640)
-    let when = Date(timeIntervalSince1970: 1_500_000_000)
-    try fs.setModificationDate(base + "/b.bin", when)
-    let st = try fs.stat(base + "/b.bin")
-    if st.permissions != nil { #expect(st.permissions == 0o640) } // pyftpdlib omits unix.mode
-    #expect(st.modified == when)
+    let st: RemoteEntry
+    if attributes {
+        try fs.setPermissions(base + "/b.bin", 0o640)
+        let when = Date(timeIntervalSince1970: 1_500_000_000)
+        try fs.setModificationDate(base + "/b.bin", when)
+        st = try fs.stat(base + "/b.bin")
+        if st.permissions != nil { #expect(st.permissions == 0o640) } // pyftpdlib omits unix.mode
+        #expect(st.modified == when)
+    } else {
+        st = try fs.stat(base + "/b.bin") // WebDAV/S3: no permissions, server-set times
+        #expect(st.size == 200_000 && st.kind == .file)
+    }
 
     let localDst = FileManager.default.temporaryDirectory.appendingPathComponent("dst-\(UUID().uuidString)")
     try fs.download(base + "/b.bin", to: localDst, offset: 0) { _ in true }

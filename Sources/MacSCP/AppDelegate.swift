@@ -223,7 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func openWorkspace(_ ws: Workspace) {
-        for site in ws.sites where site.fileProtocol.isSupported {
+        for site in ws.sites {
             openSession(site, password: site.hasStoredPassword ? store.secrets.password(for: site.id) : nil)
         }
     }

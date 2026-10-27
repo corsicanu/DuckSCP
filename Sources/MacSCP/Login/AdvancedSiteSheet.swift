@@ -14,6 +14,7 @@ final class AdvancedSiteSheet: NSWindowController {
     private let passive = NSButton(checkboxWithTitle: "Passive mode", target: nil, action: nil)
     private let compression = NSButton(checkboxWithTitle: "Enable SSH compression", target: nil, action: nil)
     private let timeOffset = textField(80)
+    private let s3Region = textField(160)
     private let proxyKind = NSPopUpButton()
     private let proxyHost = textField(200)
     private let proxyPort = textField(70)
@@ -40,6 +41,8 @@ final class AdvancedSiteSheet: NSWindowController {
         compression.isEnabled = site.fileProtocol == .sftp || site.fileProtocol == .scp
         timeOffset.stringValue = site.timeOffsetHours == 0 ? "0" : String(site.timeOffsetHours)
         timeOffset.toolTip = "Hours added to remote file times, for servers that list times in another time zone."
+        s3Region.stringValue = site.s3Region
+        s3Region.isEnabled = site.fileProtocol == .s3
         ProxySettings.Kind.allCases.forEach { proxyKind.addItem(withTitle: $0.title) }
         proxyKind.selectItem(at: ProxySettings.Kind.allCases.firstIndex(of: site.proxy.kind) ?? 0)
         proxyHost.stringValue = site.proxy.host
@@ -59,6 +62,7 @@ final class AdvancedSiteSheet: NSWindowController {
             [NSGridCell.emptyContentView, passive, NSGridCell.emptyContentView],
             [NSGridCell.emptyContentView, compression, NSGridCell.emptyContentView],
             [label("Timezone offset (h):"), timeOffset, NSGridCell.emptyContentView],
+            [label("S3 region:"), s3Region, NSGridCell.emptyContentView],
             [label("Proxy:"), proxyRow, NSGridCell.emptyContentView],
             [label("Proxy user / password:"), proxyAuth, NSGridCell.emptyContentView],
         ])
@@ -111,6 +115,7 @@ final class AdvancedSiteSheet: NSWindowController {
         site.ftpPassive = passive.state == .on
         site.sshCompression = compression.state == .on
         site.timeOffsetHours = Double(timeOffset.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+        site.s3Region = s3Region.stringValue.trimmingCharacters(in: .whitespaces)
         site.proxy.kind = ProxySettings.Kind.allCases[max(0, proxyKind.indexOfSelectedItem)]
         site.proxy.host = proxyHost.stringValue.trimmingCharacters(in: .whitespaces)
         site.proxy.port = Int(proxyPort.stringValue) ?? 1080

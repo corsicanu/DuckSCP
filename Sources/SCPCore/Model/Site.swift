@@ -15,7 +15,8 @@ public enum FileProtocol: String, Codable, CaseIterable {
     }
 
     /// Protocols this app can actually connect with.
-    public var isSupported: Bool { self == .sftp || self == .scp || self == .ftp }
+    /// Protocols whose "Encryption" choice means TLS (FTP: implicit/explicit, HTTP-based: https).
+    public var hasEncryptionChoice: Bool { self == .ftp || self == .webdav || self == .s3 }
 }
 
 /// FTP encryption modes, matching WinSCP's "Encryption" drop-down.
@@ -55,6 +56,8 @@ public struct Site: Codable, Equatable, Identifiable {
     /// Hours added to remote timestamps (WinSCP: Environment → Timezone offset).
     public var timeOffsetHours: Double = 0
     public var proxy = ProxySettings()
+    /// S3 signing region (WinSCP: S3 → Default region).
+    public var s3Region = "us-east-1"
     /// Problems found during import that the user should look at.
     public var importWarnings: [String]
 
@@ -106,13 +109,14 @@ public struct Site: Codable, Equatable, Identifiable {
         sshCompression = try c.decodeIfPresent(Bool.self, forKey: .sshCompression) ?? false
         timeOffsetHours = try c.decodeIfPresent(Double.self, forKey: .timeOffsetHours) ?? 0
         proxy = (try? c.decode(ProxySettings.self, forKey: .proxy)) ?? ProxySettings()
+        s3Region = (try? c.decode(String.self, forKey: .s3Region)) ?? "us-east-1"
     }
 
     public static func defaultPort(_ p: FileProtocol, _ enc: FtpEncryption) -> Int {
         switch p {
         case .sftp, .scp: return 22
         case .ftp: return enc == .implicitTLS ? 990 : 21
-        case .webdav, .s3: return 443
+        case .webdav, .s3: return enc == .none ? 80 : 443
         }
     }
 

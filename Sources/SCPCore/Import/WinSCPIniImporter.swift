@@ -125,9 +125,6 @@ public struct WinSCPIniImporter {
             proto = .sftp
             warnings.append("Unknown protocol code \(other); defaulted to SFTP.")
         }
-        if !proto.isSupported {
-            warnings.append("\(proto.title) is not supported yet; this site cannot connect.")
-        }
         // WinSCP TFtps: 0 none, 1 implicit, 2 explicit SSL (legacy), 3 explicit TLS.
         let enc: FtpEncryption
         switch int("Ftps") ?? 0 {
@@ -177,6 +174,7 @@ public struct WinSCPIniImporter {
                         localDirectory: localDir, note: str("Note"), color: int("Color"),
                         hasStoredPassword: password != nil, importWarnings: warnings)
         site.sshCompression = section["Compression"] == "1"
+        if let region = section["S3DefaultRegion"], !region.isEmpty { site.s3Region = winscpUnmunge(region) }
         // TProxyMethod: 0 none, 1 SOCKS4, 2 SOCKS5, 3 HTTP, 4 Telnet, 5 Local command
         switch int("ProxyMethod") ?? 0 {
         case 1: site.proxy.kind = .socks4
