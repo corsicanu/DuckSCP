@@ -169,7 +169,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         let m = NSMenu()
         m.add("Import Sites from WinSCP.ini…", #selector(importIniFromPanel), target: self)
         m.addItem(.separator())
-        m.add("Preferences…", nil).isEnabled = false
+        m.add("Preferences…", #selector(AppDelegate.showPreferences))
         m.add("About \(Branding.appName)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)))
         return m
     }
@@ -501,6 +501,11 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             let result = try WinSCPIniImporter().importFile(at: url)
             let count = try store.merge(result)
             let keyCount = hostKeys.importWinSCP(result.hostKeys)
+            var prefsApplied: [String] = []
+            if let prefs = (NSApp.delegate as? AppDelegate)?.prefs, !result.preferenceChanges.isEmpty {
+                try prefs.update { p in result.preferenceChanges.forEach { $0.apply(&p) } }
+                prefsApplied = result.preferenceChanges.map(\.name)
+            }
             reloadTree(select: result.sites.first?.id)
             let alert = NSAlert()
             alert.messageText = "Imported \(count) site\(count == 1 ? "" : "s") from \(url.lastPathComponent)"
@@ -509,6 +514,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             if !warned.isEmpty {
                 info.append("\(warned.count) site(s) need attention (marked ⚠︎): " + warned.map(\.path).joined(separator: ", "))
             }
+            if !prefsApplied.isEmpty { info.append("Applied WinSCP preferences: \(prefsApplied.joined(separator: ", ")).") }
             if keyCount > 0 { info.append("Imported \(keyCount) cached host key(s).") }
             info.append("Passwords were moved into the macOS Keychain. Consider deleting the .ini file; its passwords are only obfuscated, not encrypted.")
             alert.informativeText = info.joined(separator: "\n\n")

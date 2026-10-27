@@ -69,6 +69,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        if args.contains("--show-preferences") {
+            showPreferences()
+            if let tab = value(after: "--show-preferences", in: args), let i = Int(tab) { preferencesWindow?.selectTab(i) }
+        }
+
         if let snapshotDir {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 Snapshot.run(to: URL(fileURLWithPath: snapshotDir), app: self)
@@ -109,6 +114,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var hostKeys: HostKeyStore!
     private(set) var prefs: PreferencesStore!
 
+    static var defaultLogURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/\(Branding.appName)/session.log")
+    }
+
+    static func logURL(_ p: Preferences) -> URL {
+        p.logPath.isEmpty ? defaultLogURL : URL(fileURLWithPath: (p.logPath as NSString).expandingTildeInPath)
+    }
+
+    private var sessionLog: SessionLog?
+    private var sessionLogURL: URL?
+
+    /// Connection settings from Preferences → Network / Logging.
+    func connectionSettings() -> ConnectionSettings {
+        let p = prefs.current
+        var log: SessionLog?
+        if p.loggingEnabled {
+            let url = Self.logURL(p)
+            if sessionLogURL != url {
+                sessionLog = try? SessionLog(url: url)
+                sessionLogURL = url
+            }
+            log = sessionLog
+        }
+        return ConnectionSettings(p, log: log)
+    }
+
+    private var preferencesWindow: PreferencesWindowController?
+
+    @objc func showPreferences() {
+        if preferencesWindow == nil { preferencesWindow = PreferencesWindowController(store: prefs, hostKeys: hostKeys) }
+        preferencesWindow?.showWindow(nil)
+    }
+
+    @objc func toggleHiddenFiles() {
+        try? prefs.update { $0.showHiddenFiles.toggle() }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard prefs.current.confirmExitWithTransfers, commander?.tabs.contains(where: { $0.queue.hasActiveItems }) == true else {
+            return .terminateNow
+        }
+        let a = NSAlert()
+        a.messageText = "Transfers are still running. Quit anyway?"
+        a.addButton(withTitle: "Quit")
+        a.addButton(withTitle: "Cancel")
+        return a.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+
     /// System = follow macOS light/dark automatically.
     func applyTheme() {
         switch prefs.current.theme {
@@ -125,14 +178,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connecting.append(dialog)
         dialog.showWindow(nil)
         let hostKeys = self.hostKeys!
+        let settings = connectionSettings()
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result<RemoteSession, Error> {
-                let fs = try Connector.connect(site: site, password: password, prompter: dialog, hostKeys: hostKeys)
+                let fs = try Connector.connect(site: site, password: password, prompter: dialog, hostKeys: hostKeys, settings: settings)
                 if dialog.isCancelled { fs.close(); throw FileSystemError.cancelled }
                 let cached = dialog.cached
                 if cached.password == nil { cached.password = password }
                 return RemoteSession(site: site, fs: fs) {
-                    try Connector.connect(site: site, password: cached.password, prompter: cached, hostKeys: hostKeys)
+                    try Connector.connect(site: site, password: cached.password, prompter: cached, hostKeys: hostKeys, settings: settings)
                 }
             }
             DispatchQueue.main.async { [self] in

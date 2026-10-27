@@ -50,6 +50,10 @@ public struct Site: Codable, Equatable, Identifiable {
     public var note: String
     public var color: Int?
     public var hasStoredPassword: Bool
+    /// SSH compression (WinSCP: SSH → Enable compression).
+    public var sshCompression = false
+    /// Hours added to remote timestamps (WinSCP: Environment → Timezone offset).
+    public var timeOffsetHours: Double = 0
     /// Problems found during import that the user should look at.
     public var importWarnings: [String]
 
@@ -98,6 +102,8 @@ public struct Site: Codable, Equatable, Identifiable {
                   color: try c.decodeIfPresent(Int.self, forKey: .color),
                   hasStoredPassword: try c.decodeIfPresent(Bool.self, forKey: .hasStoredPassword) ?? false,
                   importWarnings: try c.decodeIfPresent([String].self, forKey: .importWarnings) ?? [])
+        sshCompression = try c.decodeIfPresent(Bool.self, forKey: .sshCompression) ?? false
+        timeOffsetHours = try c.decodeIfPresent(Double.self, forKey: .timeOffsetHours) ?? 0
     }
 
     public static func defaultPort(_ p: FileProtocol, _ enc: FtpEncryption) -> Int {

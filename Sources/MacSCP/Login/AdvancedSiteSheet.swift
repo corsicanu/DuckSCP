@@ -12,10 +12,12 @@ final class AdvancedSiteSheet: NSWindowController {
     private let noteField = textField(280)
     private let scpFallback = NSButton(checkboxWithTitle: "Allow SCP fallback", target: nil, action: nil)
     private let passive = NSButton(checkboxWithTitle: "Passive mode", target: nil, action: nil)
+    private let compression = NSButton(checkboxWithTitle: "Enable SSH compression", target: nil, action: nil)
+    private let timeOffset = textField(80)
 
     init(site: Site) {
         self.site = site
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 360), styleMask: [.titled], backing: .buffered, defer: false)
         panel.title = "Advanced Site Settings"
         super.init(window: panel)
 
@@ -27,6 +29,10 @@ final class AdvancedSiteSheet: NSWindowController {
         passive.state = site.ftpPassive ? .on : .off
         scpFallback.isEnabled = site.fileProtocol == .sftp
         passive.isEnabled = site.fileProtocol == .ftp
+        compression.state = site.sshCompression ? .on : .off
+        compression.isEnabled = site.fileProtocol == .sftp || site.fileProtocol == .scp
+        timeOffset.stringValue = site.timeOffsetHours == 0 ? "0" : String(site.timeOffsetHours)
+        timeOffset.toolTip = "Hours added to remote file times, for servers that list times in another time zone."
 
         let grid = NSGridView(views: [
             [label("Private key file:"), keyField, button("…", self, #selector(browseKey))],
@@ -35,6 +41,8 @@ final class AdvancedSiteSheet: NSWindowController {
             [label("Note:"), noteField, NSGridCell.emptyContentView],
             [NSGridCell.emptyContentView, scpFallback, NSGridCell.emptyContentView],
             [NSGridCell.emptyContentView, passive, NSGridCell.emptyContentView],
+            [NSGridCell.emptyContentView, compression, NSGridCell.emptyContentView],
+            [label("Timezone offset (h):"), timeOffset, NSGridCell.emptyContentView],
         ])
         grid.translatesAutoresizingMaskIntoConstraints = false
         grid.column(at: 0).xPlacement = .trailing
@@ -83,6 +91,8 @@ final class AdvancedSiteSheet: NSWindowController {
         site.note = noteField.stringValue
         site.allowScpFallback = scpFallback.state == .on
         site.ftpPassive = passive.state == .on
+        site.sshCompression = compression.state == .on
+        site.timeOffsetHours = Double(timeOffset.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0
         onDone?(site)
         end()
     }

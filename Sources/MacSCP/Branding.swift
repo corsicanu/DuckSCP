@@ -1,7 +1,13 @@
-import Foundation
+import AppKit
+import SCPCore
 
 /// Everything brand-specific is read from Info.plist, which scripts/build_app.sh
 /// fills from branding.env. Rebranding = edit branding.env and rebuild.
+/// Current preferences (defaults before the app finished launching).
+var currentPrefs: Preferences {
+    (NSApp?.delegate as? AppDelegate)?.prefs?.current ?? Preferences()
+}
+
 enum Branding {
     static var appName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "MacSCP"

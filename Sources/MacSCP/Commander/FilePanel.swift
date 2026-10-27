@@ -55,6 +55,19 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     private(set) var path: String
     private(set) var entries: [RemoteEntry] = []
+    /// Unfiltered listing; `entries` hides dot files unless "Show hidden files" is on.
+    private var allEntries: [RemoteEntry] = []
+
+    static func visible(_ list: [RemoteEntry]) -> [RemoteEntry] {
+        currentPrefs.showHiddenFiles ? list : list.filter { !$0.name.hasPrefix(".") }
+    }
+
+    /// Re-applies display preferences (hidden files, size format) without re-listing.
+    func preferencesChanged() {
+        pendingSelection = selectedEntries.first?.name
+        entries = Self.visible(allEntries)
+        sortAndReload()
+    }
     private var history: [String] = []
     private var future: [String] = []
     private var pendingSelection: String?
@@ -227,7 +240,8 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
                     self.future.removeAll()
                 }
                 self.path = newPath
-                self.entries = list
+                self.allEntries = list
+                self.entries = Self.visible(list)
                 self.pendingSelection = select
                 self.sortAndReload()
                 self.rebuildPathPopup()
@@ -311,33 +325,16 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     private func sortAndReload() {
         let sd = table.sortDescriptors.first ?? NSSortDescriptor(key: PanelColumn.name.rawValue, ascending: true)
         let key = PanelColumn(rawValue: sd.key ?? "") ?? .name
-        // Type names come from UTType lookups: compute once per extension, not per comparison
-        // (25k entries ≈ 375k comparisons).
-        var typeCache: [String: String] = [:]
-        if key == .type {
-            for e in entries where !e.isDirectoryLike {
-                let ext = (e.name as NSString).pathExtension
-                if typeCache[ext] == nil { typeCache[ext] = typeName(e) }
-            }
+        let sortKey: EntrySort.Key
+        switch key {
+        case .name: sortKey = .name
+        case .size: sortKey = .size
+        case .changed: sortKey = .changed
+        case .rights, .attr: sortKey = .rights
+        case .owner: sortKey = .owner
+        case .type: sortKey = .type
         }
-        func cachedType(_ e: RemoteEntry) -> String {
-            e.isDirectoryLike ? "File folder" : typeCache[(e.name as NSString).pathExtension] ?? ""
-        }
-        entries.sort { a, b in
-            // Directories always first, as in WinSCP.
-            if a.isDirectoryLike != b.isDirectoryLike { return a.isDirectoryLike }
-            let ordered: ComparisonResult
-            switch key {
-            case .size: ordered = a.size == b.size ? .orderedSame : (a.size < b.size ? .orderedAscending : .orderedDescending)
-            case .changed: ordered = (a.modified ?? .distantPast).compare(b.modified ?? .distantPast)
-            case .rights, .attr: ordered = a.rightsString.compare(b.rightsString)
-            case .owner: ordered = a.owner.compare(b.owner)
-            case .type: ordered = cachedType(a).compare(cachedType(b))
-            case .name: ordered = .orderedSame
-            }
-            let result = ordered == .orderedSame ? a.name.localizedStandardCompare(b.name) : ordered
-            return sd.ascending ? result == .orderedAscending : result == .orderedDescending
-        }
+        EntrySort.sort(&entries, by: sortKey, ascending: sd.ascending, typeName: typeName)
         table.reloadData()
         var row = 0
         if let name = pendingSelection, let i = entries.firstIndex(where: { $0.name == name }) {
@@ -558,8 +555,17 @@ enum Format {
         return f
     }()
 
+    /// Size column text in the format chosen in Preferences → Panels.
+    static func size(_ bytes: UInt64) -> String {
+        switch currentPrefs.sizeFormat {
+        case .bytes: return exact(bytes)
+        case .kilobytes: return exact((bytes + 1023) / 1024) + " KB"
+        case .short: return shortSize(bytes)
+        }
+    }
+
     /// Exact byte counts with grouping, WinSCP's default size format.
-    static func size(_ bytes: UInt64) -> String { number.string(from: NSNumber(value: bytes)) ?? "\(bytes)" }
+    static func exact(_ bytes: UInt64) -> String { number.string(from: NSNumber(value: bytes)) ?? "\(bytes)" }
 
     static func shortSize(_ bytes: UInt64) -> String {
         if bytes == 0 { return "0 B" }

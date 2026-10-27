@@ -49,6 +49,9 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         buildUI()
         updateTitle()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateStatusBar() }
+        NotificationCenter.default.addObserver(forName: PreferencesStore.didChange, object: nil, queue: .main) { [weak self] _ in
+            self?.tabs.forEach { $0.local.preferencesChanged(); $0.remote.preferencesChanged() }
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -228,6 +231,13 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     @objc func disconnect() {
         guard let tab = current, let i = tabs.firstIndex(where: { $0 === tab }) else { return }
+        if currentPrefs.confirmDisconnect && !tab.queue.hasActiveItems {
+            let a = NSAlert()
+            a.messageText = "Close session \"\(tab.title)\"?"
+            a.addButton(withTitle: "OK")
+            a.addButton(withTitle: "Cancel")
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
         if tab.queue.hasActiveItems {
             let a = NSAlert()
             a.messageText = "There are transfers in the queue. Disconnect anyway?"
@@ -347,9 +357,11 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     @objc func cmdDelete() {
         guard let panel = activePanel, !panel.selectedEntries.isEmpty else { return NSSound.beep() }
         let entries = panel.selectedEntries
+        let paths = entries.map { RemotePath.join(panel.path, $0.name) }
+        guard currentPrefs.confirmDelete else { return performDelete(entries, paths, in: panel) }
         let alert = NSAlert()
         alert.messageText = entries.count == 1 ? "Delete \"\(entries[0].name)\"?" : "Delete \(entries.count) files?"
-        if panel.backend.isLocal {
+        if panel.backend.isLocal && currentPrefs.useTrashForLocalDelete {
             alert.informativeText = "Items are moved to the Trash."
         } else {
             alert.informativeText = "This cannot be undone."
@@ -359,21 +371,31 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window!) { [self] r in
             guard r == .alertFirstButtonReturn else { return }
-            let paths = entries.map { RemotePath.join(panel.path, $0.name) }
-            if panel.backend.isLocal {
-                do {
-                    for p in paths { try FileManager.default.trashItem(at: URL(fileURLWithPath: p), resultingItemURL: nil) }
-                } catch {
-                    showError(error, in: window)
+            performDelete(entries, paths, in: panel)
+        }
+    }
+
+    private func performDelete(_ entries: [RemoteEntry], _ paths: [String], in panel: FilePanel) {
+        if panel.backend.isLocal {
+            do {
+                for p in paths {
+                    let url = URL(fileURLWithPath: p)
+                    if currentPrefs.useTrashForLocalDelete {
+                        try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+                    } else {
+                        try FileManager.default.removeItem(at: url)
+                    }
                 }
+            } catch {
+                showError(error, in: window)
+            }
+            panel.refresh()
+        } else {
+            run(on: panel, { fs in
+                for (p, e) in zip(paths, entries) { try RecursiveOps.delete(p, entry: e, fs: fs) }
+            }) { [self] r in
+                if case .failure(let err) = r { showError(err, in: window) }
                 panel.refresh()
-            } else {
-                run(on: panel, { fs in
-                    for (p, e) in zip(paths, entries) { try RecursiveOps.delete(p, entry: e, fs: fs) }
-                }) { [self] r in
-                    if case .failure(let err) = r { showError(err, in: window) }
-                    panel.refresh()
-                }
             }
         }
     }
@@ -395,18 +417,24 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     @objc func cmdEdit() {
         guard let panel = activePanel, let e = panel.selectedEntries.first, !e.isDirectoryLike else { return NSSound.beep() }
         if panel.backend.isLocal {
-            NSWorkspace.shared.open(URL(fileURLWithPath: RemotePath.join(panel.path, e.name)))
+            EditorLauncher.edit(URL(fileURLWithPath: RemotePath.join(panel.path, e.name)), prefs: currentPrefs)
         } else {
-            transfers.editRemote(e, in: panel)
+            transfers.editRemote(e, in: panel, useEditor: true)
         }
     }
 
+    /// Double-click / Return on a file, per Preferences → Panels → Double-click.
     private func openFile(_ panel: FilePanel) {
         guard let e = panel.selectedEntries.first else { return }
-        if panel.backend.isLocal {
-            NSWorkspace.shared.open(URL(fileURLWithPath: RemotePath.join(panel.path, e.name)))
-        } else {
-            transfers.editRemote(e, in: panel)
+        switch currentPrefs.doubleClickAction {
+        case .copy: cmdCopy()
+        case .edit: cmdEdit()
+        case .open:
+            if panel.backend.isLocal {
+                NSWorkspace.shared.open(URL(fileURLWithPath: RemotePath.join(panel.path, e.name)))
+            } else {
+                transfers.editRemote(e, in: panel, useEditor: false)
+            }
         }
     }
 

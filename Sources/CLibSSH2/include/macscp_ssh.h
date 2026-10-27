@@ -7,7 +7,8 @@
 #include "libssh2_sftp.h"
 
 /// Connects a TCP socket with a timeout. Returns fd or -1 (errno set / *gai_error set).
-int macscp_tcp_connect(const char *host, int port, int timeout_ms, int *gai_error);
+/// family: 0 = any, 4 = IPv4 only, 6 = IPv6 only.
+int macscp_tcp_connect(const char *host, int port, int timeout_ms, int family, int *gai_error);
 
 LIBSSH2_SESSION *macscp_session_init(void);
 

@@ -8,6 +8,8 @@ enum MainMenu {
         let appMenu = NSMenu()
         appMenu.add("About \(name)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), "")
         appMenu.addItem(.separator())
+        appMenu.add("Preferences…", #selector(AppDelegate.showPreferences), ",")
+        appMenu.addItem(.separator())
         appMenu.add("Hide \(name)", #selector(NSApplication.hide(_:)), "h")
         appMenu.add("Quit \(name)", #selector(NSApplication.terminate(_:)), "q")
         main.addItem(submenu: appMenu, title: name)
@@ -29,6 +31,10 @@ enum MainMenu {
             item.tag = tag
         }
         main.addItem(submenu: files, title: "Files")
+
+        let view = NSMenu(title: "View")
+        view.add("Show Hidden Files", #selector(AppDelegate.toggleHiddenFiles), ".", modifiers: [.command, .shift])
+        main.addItem(submenu: view, title: "View")
 
         let edit = NSMenu(title: "Edit")
         edit.add("Cut", #selector(NSText.cut(_:)), "x")

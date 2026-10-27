@@ -107,6 +107,7 @@ public final class TransferEngine {
         guard depth < Self.maxDepth else { throw FileSystemError(.other, "Directory tree too deep: \(src)") }
         let dst = localDir.appendingPathComponent(e.name)
         if e.isDirectoryLike && !follows(e, depth: depth) { return skipFile(0) }
+        if options.exclude.matches(e.name, isDirectory: e.isDirectoryLike) { return skipFile(0) }
         if e.isDirectoryLike {
             var isDir: ObjCBool = false
             if !FileManager.default.fileExists(atPath: dst.path, isDirectory: &isDir) {
@@ -140,7 +141,7 @@ public final class TransferEngine {
         if options.resume, fs.supportsResume, partSize > 0, partSize < e.size {
             offset = partSize
         }
-        let usePart = e.size >= Self.partialThreshold || offset > 0
+        let usePart = e.size >= options.partialThreshold || offset > 0
         let target = usePart ? part : dst
         try startFile(e.name, total: e.size, done: offset)
         try fs.download(src, to: target, offset: offset) { [self] n in tick(n) }
@@ -184,6 +185,7 @@ public final class TransferEngine {
         let isLink = (try? FileManager.default.attributesOfItem(atPath: url.path)[.type] as? FileAttributeType) == .typeSymbolicLink
         if isLink && depth > 0 { return skipFile(0) }
         let attrs = try FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path)
+        if options.exclude.matches(name, isDirectory: attrs[.type] as? FileAttributeType == .typeDirectory) { return skipFile(0) }
         let modified = attrs[.modificationDate] as? Date
         let mode = (attrs[.posixPermissions] as? NSNumber)?.uint32Value
 
@@ -208,7 +210,7 @@ public final class TransferEngine {
             if decision == .cancel { throw FileSystemError.cancelled }
             if decision == .skip { return skipFile(size) }
         }
-        let usePart = fs.supportsResume && size >= Self.partialThreshold
+        let usePart = fs.supportsResume && size >= options.partialThreshold
         if usePart, options.resume, let p = try? fs.stat(part), p.size > 0, p.size < size {
             offset = p.size
         }
@@ -240,6 +242,19 @@ public final class TransferEngine {
     }
 
     private var lastFileDone: UInt64 = 0
+    private var throttleStart: Date?
+    private var throttledBytes: UInt64 = 0
+
+    /// Sleeps so the average rate stays at or below `options.speedLimit`.
+    private func throttle(_ bytes: UInt64) {
+        guard options.speedLimit > 0 else { return }
+        let start = throttleStart ?? Date()
+        throttleStart = start
+        throttledBytes += bytes
+        let due = Double(throttledBytes) / Double(options.speedLimit)
+        let ahead = due - Date().timeIntervalSince(start)
+        if ahead > 0 { Thread.sleep(forTimeInterval: min(ahead, 5)) }
+    }
     private var cancelled = false
 
     private func startFile(_ name: String, total: UInt64, done: UInt64) throws {
@@ -254,6 +269,7 @@ public final class TransferEngine {
 
     /// Called from the file system's progress callback with the running byte count.
     private func tick(_ n: UInt64) -> Bool {
+        throttle(n &- lastFileDone)
         progress.totalDone += n &- lastFileDone
         progress.fileDone = n
         lastFileDone = n

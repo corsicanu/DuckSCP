@@ -12,11 +12,13 @@ public final class FTPFileSystem: RemoteFileSystem {
     /// libcurl keeps this pointer, so it must not move: allocated once, freed in deinit.
     private let errorBuffer = UnsafeMutablePointer<CChar>.allocate(capacity: Int(CURL_ERROR_SIZE) + 1)
     private var listCommand = "MLSD"
+    var settings = ConnectionSettings()
 
     private static let initOnce: Void = { curl_global_init(Int(CURL_GLOBAL_DEFAULT)) }()
 
     /// Connects and logs in, asking for a password (and about untrusted TLS certificates) as needed.
-    public static func connect(site: Site, password: String?, prompter: ConnectionPrompter) throws -> FTPFileSystem {
+    public static func connect(site: Site, password: String?, prompter: ConnectionPrompter,
+                               settings: ConnectionSettings = .init()) throws -> FTPFileSystem {
         _ = initOnce
         var current = password
         let user = site.userName.isEmpty ? "anonymous" : site.userName
@@ -30,6 +32,7 @@ public final class FTPFileSystem: RemoteFileSystem {
             prompter.status("Connecting to \(site.hostName)...")
             let fs = try FTPFileSystem(site: site, user: user, password: current ?? "")
             fs.verifyPeer = verify
+            fs.settings = settings
             do {
                 _ = try fs.homeDirectory()
                 prompter.status("Connected.")
@@ -96,7 +99,12 @@ public final class FTPFileSystem: RemoteFileSystem {
         macscp_curl_str(curl, CURLOPT_URL, url)
         macscp_curl_str(curl, CURLOPT_USERNAME, user)
         macscp_curl_str(curl, CURLOPT_PASSWORD, password)
-        macscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, 15)
+        macscp_curl_long(curl, CURLOPT_CONNECTTIMEOUT, Int(settings.timeout))
+        switch settings.ipVersion {
+        case .ipv4: macscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V4))
+        case .ipv6: macscp_curl_long(curl, CURLOPT_IPRESOLVE, Int(CURL_IPRESOLVE_V6))
+        case .auto: break
+        }
         // Abort stalled transfers: under 1 byte/s for 60 s.
         macscp_curl_long(curl, CURLOPT_LOW_SPEED_LIMIT, 1)
         macscp_curl_long(curl, CURLOPT_LOW_SPEED_TIME, 60)

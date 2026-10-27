@@ -10,12 +10,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-int macscp_tcp_connect(const char *host, int port, int timeout_ms, int *gai_error) {
+int macscp_tcp_connect(const char *host, int port, int timeout_ms, int family, int *gai_error) {
     struct addrinfo hints, *res = NULL, *ai;
     char portstr[16];
     int fd = -1;
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = family == 4 ? AF_INET : family == 6 ? AF_INET6 : AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portstr, sizeof portstr, "%d", port);
     *gai_error = getaddrinfo(host, portstr, &hints, &res);

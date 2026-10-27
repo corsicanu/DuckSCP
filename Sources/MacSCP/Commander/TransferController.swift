@@ -65,6 +65,8 @@ final class TransferController {
     func confirmAndQueue(entries: [RemoteEntry], from src: FilePanel, to dst: FilePanel, move: Bool) {
         guard let window = commander.window else { return }
         let upload = src.backend.isLocal
+        options = currentPrefs.transferOptions
+        transferInBackground = currentPrefs.transferInBackgroundByDefault
         let what = entries.count == 1 ? "\"\(entries[0].name)\"" : "\(entries.count) files"
         let alert = NSAlert()
         alert.messageText = "\(move ? "Move" : "Copy") \(what) to \(upload ? "remote" : "local") directory:"
@@ -112,7 +114,8 @@ final class TransferController {
     func uploadFromFinder(_ paths: [String], to panel: FilePanel) {
         guard let session = (panel.backend as? RemoteBackend)?.session else { return }
         let urls = paths.map { URL(fileURLWithPath: $0) }
-        runForeground(title: "Uploading", session: session) { [options] fs, ask, report in
+        let options = currentPrefs.transferOptions
+        runForeground(title: "Uploading", session: session) { fs, ask, report in
             try TransferEngine(fs: fs, options: options, ask: ask, report: report).upload(urls, to: panel.path)
         } completion: { panel.refresh() }
     }
@@ -172,7 +175,8 @@ final class TransferController {
     private var editors: [RemoteEditSession] = []
 
     /// Downloads to a private temp folder, opens the default editor and uploads on every save.
-    func editRemote(_ entry: RemoteEntry, in panel: FilePanel) {
+    /// - Parameter useEditor: true = text editor (F4), false = the file's default app.
+    func editRemote(_ entry: RemoteEntry, in panel: FilePanel, useEditor: Bool = true) {
         guard let session = (panel.backend as? RemoteBackend)?.session else { return }
         let remotePath = RemotePath.join(panel.path, entry.name)
         guard RemotePath.isSafeName(entry.name) else { return }
@@ -196,7 +200,7 @@ final class TransferController {
                     panel.refresh()
                 }
                 self.editors.append(editor)
-                NSWorkspace.shared.open(local)
+                if useEditor { EditorLauncher.edit(local, prefs: currentPrefs) } else { NSWorkspace.shared.open(local) }
             }
         } catch {
             showError(error, in: commander.window)
@@ -277,6 +281,7 @@ final class RemoteEditSession {
 /// WinSCP's "Confirm overwrite" question.
 enum OverwritePrompt {
     static func ask(_ c: TransferEngine.Conflict, window: NSWindow?) -> TransferEngine.Decision {
+        guard currentPrefs.confirmOverwrite else { return .overwrite }
         let alert = NSAlert()
         alert.messageText = "File \"\(c.name)\" already exists. Overwrite it?"
         func describe(_ size: UInt64, _ date: Date?) -> String {

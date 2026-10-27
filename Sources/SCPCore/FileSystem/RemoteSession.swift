@@ -18,7 +18,7 @@ public final class RemoteSession {
         queue = DispatchQueue(label: "session.\(site.hostName)", qos: .userInitiated)
         homeDirectory = (try? fs.homeDirectory()) ?? "/"
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + 30, repeating: 30)
+        timer.schedule(deadline: .now() + 15, repeating: 15) // libssh2 sends only when its interval is due
         timer.setEventHandler { [weak fs] in fs?.keepalive() }
         timer.resume()
         keepaliveTimer = timer

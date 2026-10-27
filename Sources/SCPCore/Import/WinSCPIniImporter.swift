@@ -10,6 +10,8 @@ public struct WinSCPIniImporter {
         public var hostKeys: [(key: String, value: String)] = []
         /// File-level messages (master password, skipped workspaces, ...).
         public var messages: [String] = []
+        /// WinSCP preferences found in the file, applied on top of the current ones.
+        public var preferenceChanges: [(name: String, apply: (inout Preferences) -> Void)] = []
     }
 
     /// Where Windows key file names are looked up on this Mac.
@@ -53,7 +55,36 @@ public struct WinSCPIniImporter {
         if let keys = ini.section("SshHostKeys") {
             result.hostKeys = keys.entries
         }
+        result.preferenceChanges = preferences(ini)
         return result
+    }
+
+    /// Best-effort mapping of WinSCP's [Configuration\…] keys to our preferences.
+    /// Keys are looked up in any Configuration section, so layout differences between
+    /// WinSCP versions do not matter; unknown keys are ignored.
+    func preferences(_ ini: IniFile) -> [(name: String, apply: (inout Preferences) -> Void)] {
+        let config = ini.sections.filter { $0.name.lowercased().hasPrefix("configuration") }
+        func value(_ key: String) -> String? { config.lazy.compactMap { $0[key] }.first }
+        func bool(_ key: String) -> Bool? { value(key).flatMap { $0 == "1" ? true : $0 == "0" ? false : nil } }
+        func int(_ key: String) -> Int? { value(key).flatMap { Int($0) } }
+        var out: [(String, (inout Preferences) -> Void)] = []
+        if let v = bool("ConfirmOverwriting") { out.append(("Confirm overwriting", { $0.confirmOverwrite = v })) }
+        if let v = bool("ConfirmDeleting") { out.append(("Confirm deleting", { $0.confirmDelete = v })) }
+        if let v = bool("ConfirmClosingSession") { out.append(("Confirm closing session", { $0.confirmDisconnect = v })) }
+        if let v = bool("ShowHiddenFiles") { out.append(("Show hidden files", { $0.showHiddenFiles = v })) }
+        if let v = bool("DeleteToRecycleBin") { out.append(("Delete to Trash", { $0.useTrashForLocalDelete = v })) }
+        // TDoubleClickAction: 0 open, 1 copy, 2 edit
+        if let v = int("DoubleClickAction"), (0...2).contains(v) {
+            let action: Preferences.DoubleClickAction = [.open, .copy, .edit][v]
+            out.append(("Double-click action", { $0.doubleClickAction = action }))
+        }
+        if let v = bool("PreserveTime") { out.append(("Preserve timestamp", { $0.preserveTimestamp = v })) }
+        if let v = bool("PreserveRights") { out.append(("Preserve permissions", { $0.preservePermissions = v })) }
+        // TResumeSupport: 0 on, 1 smart (threshold), 2 off
+        if let v = int("ResumeSupport") { out.append(("Transfer resume", { $0.resumeEnabled = v != 2 })) }
+        if let v = int("ResumeThreshold"), v >= 0 { out.append(("Resume threshold", { $0.resumeThresholdKB = max(1, v / 1024) })) }
+        if let v = int("CPSLimit"), v >= 0 { out.append(("Speed limit", { $0.speedLimitKBps = v / 1024 })) }
+        return out
     }
 
     private func makeSite(path: String, section: IniFile.Section, masterPassword: Bool) -> (Site, String?) {
@@ -114,12 +145,17 @@ public struct WinSCPIniImporter {
             }
         }
 
-        let site = Site(path: path, fileProtocol: proto, allowScpFallback: scpFallback,
+        var site = Site(path: path, fileProtocol: proto, allowScpFallback: scpFallback,
                         ftpEncryption: enc, ftpPassive: section["FtpPasvMode"] != "0",
                         hostName: host, port: int("PortNumber"), userName: user,
                         privateKeyPath: keyPath, remoteDirectory: str("RemoteDirectory"),
                         localDirectory: localDir, note: str("Note"), color: int("Color"),
                         hasStoredPassword: password != nil, importWarnings: warnings)
+        site.sshCompression = section["Compression"] == "1"
+        // TimeDifference is a TDateTime fraction of a day.
+        if let d = section["TimeDifference"].flatMap(Double.init), d.isFinite {
+            site.timeOffsetHours = (d * 24 * 100).rounded() / 100
+        }
         return (site, password)
     }
 }

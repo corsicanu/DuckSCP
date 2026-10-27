@@ -28,11 +28,13 @@ public final class SSHConnection {
 
     /// Connects, verifies the host key and authenticates. Throws `FileSystemError`.
     public static func open(site: Site, password: String?, prompter: ConnectionPrompter, hostKeys: HostKeyStore,
-                            timeout: TimeInterval = 15) throws -> SSHConnection {
+                            settings: ConnectionSettings = .init()) throws -> SSHConnection {
+        let timeout = settings.timeout
         _ = initOnce
         prompter.status("Searching for host...")
         var gaiError: Int32 = 0
-        let fd = macscp_tcp_connect(site.hostName, Int32(site.port), Int32(timeout * 1000), &gaiError)
+        let family: Int32 = settings.ipVersion == .ipv4 ? 4 : settings.ipVersion == .ipv6 ? 6 : 0
+        let fd = macscp_tcp_connect(site.hostName, Int32(site.port), Int32(timeout * 1000), family, &gaiError)
         guard fd >= 0 else {
             if gaiError != 0 { throw FileSystemError(.connection, "Host \"\(site.hostName)\" does not exist.") }
             throw FileSystemError(.connection, "Network error: Connection to \"\(site.hostName)\" \(errno == ETIMEDOUT ? "timed out" : "refused").")
@@ -41,11 +43,12 @@ public final class SSHConnection {
             Darwin.close(fd)
             throw FileSystemError(.connection, "Cannot initialize SSH session.")
         }
+        if site.sshCompression { libssh2_session_flag(session, LIBSSH2_FLAG_COMPRESS, 1) }
         let conn = SSHConnection(session: session, socket: fd)
         do {
             try conn.handshake(site: site, prompter: prompter, hostKeys: hostKeys, timeout: timeout)
             try conn.authenticate(site: site, password: password, prompter: prompter)
-            libssh2_keepalive_config(session, 1, 30)
+            if settings.keepalive > 0 { libssh2_keepalive_config(session, 1, UInt32(settings.keepalive)) }
             return conn
         } catch {
             conn.close()

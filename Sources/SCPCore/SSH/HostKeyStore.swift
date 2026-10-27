@@ -81,6 +81,12 @@ public final class HostKeyStore {
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
     }
 
+    /// Forgets every cached key (does not touch ~/.ssh/known_hosts).
+    public func clearAll() throws {
+        lock.withLock { keys.removeAll() }
+        if FileManager.default.fileExists(atPath: fileURL.path) { try FileManager.default.removeItem(at: fileURL) }
+    }
+
     // MARK: known_hosts
 
     static func parseKnownHosts(_ url: URL, hostID: String) -> [HostKey] {
