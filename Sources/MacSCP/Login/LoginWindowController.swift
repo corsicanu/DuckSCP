@@ -496,7 +496,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
 
     @objc private func showAdvanced() {
         readFields()
-        let sheet = AdvancedSiteSheet(site: draft)
+        let sheet = AdvancedSiteSheet(site: draft, secrets: store.secrets)
         sheet.onDone = { [weak self] edited in
             guard let self else { return }
             self.draft = edited

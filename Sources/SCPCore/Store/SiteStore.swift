@@ -58,6 +58,7 @@ public final class SiteStore {
 
     public func delete(_ id: UUID) throws {
         try secrets.setPassword(nil, for: id)
+        if let s = site(id) { try secrets.setPassword(nil, for: s.proxy.secretID) }
         sites.removeAll { $0.id == id }
         try save()
     }
@@ -108,7 +109,9 @@ public final class SiteStore {
         func fresh(_ site: Site) throws -> Site {
             var copy = site
             copy.id = UUID()
+            copy.proxy.secretID = UUID()
             if let pw = result.passwords[site.id] { try secrets.setPassword(pw, for: copy.id) }
+            if let pw = result.proxyPasswords[site.proxy.secretID] { try secrets.setPassword(pw, for: copy.proxy.secretID) }
             return copy
         }
         for site in result.sites {

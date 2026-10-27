@@ -140,6 +140,15 @@ public final class FTPFileSystem: RemoteFileSystem {
             macscp_curl_long(curl, CURLOPT_SSL_VERIFYHOST, 2)
         }
         if !site.ftpPassive { macscp_curl_str(curl, CURLOPT_FTPPORT, "-") }
+        if let proxy = site.proxy.curlURL {
+            macscp_curl_str(curl, CURLOPT_PROXY, proxy)
+            if !site.proxy.user.isEmpty {
+                macscp_curl_str(curl, CURLOPT_PROXYUSERNAME, site.proxy.user)
+                macscp_curl_str(curl, CURLOPT_PROXYPASSWORD, settings.proxyPassword ?? "")
+            }
+            // FTP over an HTTP proxy only works as a CONNECT tunnel (control and data).
+            if site.proxy.kind == .http { macscp_curl_long(curl, CURLOPT_HTTPPROXYTUNNEL, 1) }
+        }
         errorBuffer[0] = 0
     }
 
@@ -153,6 +162,7 @@ public final class FTPFileSystem: RemoteFileSystem {
         switch rc {
         case CURLE_ABORTED_BY_CALLBACK: throw FileSystemError.cancelled
         case CURLE_LOGIN_DENIED: throw FileSystemError(.authentication, "Access denied (\(detail)).")
+        case CURLE_COULDNT_RESOLVE_PROXY: throw FileSystemError(.connection, "Proxy host \"\(site.proxy.host)\" does not exist.")
         case CURLE_COULDNT_RESOLVE_HOST: throw FileSystemError(.connection, "Host \"\(site.hostName)\" does not exist.")
         case CURLE_COULDNT_CONNECT, CURLE_OPERATION_TIMEDOUT, CURLE_SEND_ERROR, CURLE_RECV_ERROR, CURLE_FTP_ACCEPT_TIMEOUT:
             throw FileSystemError(.connection, "Network error: \(detail)")

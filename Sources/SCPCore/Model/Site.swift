@@ -54,6 +54,7 @@ public struct Site: Codable, Equatable, Identifiable {
     public var sshCompression = false
     /// Hours added to remote timestamps (WinSCP: Environment → Timezone offset).
     public var timeOffsetHours: Double = 0
+    public var proxy = ProxySettings()
     /// Problems found during import that the user should look at.
     public var importWarnings: [String]
 
@@ -104,6 +105,7 @@ public struct Site: Codable, Equatable, Identifiable {
                   importWarnings: try c.decodeIfPresent([String].self, forKey: .importWarnings) ?? [])
         sshCompression = try c.decodeIfPresent(Bool.self, forKey: .sshCompression) ?? false
         timeOffsetHours = try c.decodeIfPresent(Double.self, forKey: .timeOffsetHours) ?? 0
+        proxy = (try? c.decode(ProxySettings.self, forKey: .proxy)) ?? ProxySettings()
     }
 
     public static func defaultPort(_ p: FileProtocol, _ enc: FtpEncryption) -> Int {

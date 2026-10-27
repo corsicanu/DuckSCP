@@ -77,7 +77,7 @@ Organised like WinSCP's Preferences dialog:
 | Logging | Session log (default `~/Library/Logs/MacSCP/session.log`). Paths and errors only, never passwords. |
 | Security | Clear cached host keys |
 
-Per site (Advanced…): SSH compression and a timezone offset, on top of the key, directories, SCP fallback and passive mode. Importing a `WinSCP.ini` also brings over the WinSCP preferences it recognises (confirmations, hidden files, double-click action, preserve time and rights, resume, speed limit) and per-site Compression / TimeDifference.
+Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional user and password; the password is a separate Keychain entry), SSH compression and a timezone offset, on top of the key, directories, SCP fallback and passive mode. Importing a `WinSCP.ini` also brings over the WinSCP preferences it recognises (confirmations, hidden files, double-click action, preserve time and rights, resume, speed limit) and per-site Compression / TimeDifference / proxy settings.
 
 ## Appearance
 

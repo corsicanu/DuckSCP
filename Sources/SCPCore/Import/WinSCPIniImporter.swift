@@ -6,6 +6,8 @@ public struct WinSCPIniImporter {
         public var sites: [Site] = []
         /// Decoded passwords keyed by site id (sites and workspace entries). Callers move these into the Keychain.
         public var passwords: [UUID: String] = [:]
+        /// Decoded proxy passwords keyed by `ProxySettings.secretID`.
+        public var proxyPasswords: [UUID: String] = [:]
         public var workspaces: [Workspace] = []
         /// Raw `[SshHostKeys]` entries, e.g. "ssh-ed25519@22:host" -> "0x..,0x..".
         public var hostKeys: [(key: String, value: String)] = []
@@ -55,8 +57,9 @@ public struct WinSCPIniImporter {
             let rawName = String(section.name.dropFirst(prefix.count))
             let path = rawName.split(separator: "/").map { winscpUnmunge(String($0)) }.joined(separator: "/")
             if path.isEmpty || path == "Default Settings" { continue }
-            let (site, password) = makeSite(path: path, section: section, usesMaster: usesMaster, master: master)
+            let (site, password, proxyPassword) = makeSite(path: path, section: section, usesMaster: usesMaster, master: master)
             if let password { result.passwords[site.id] = password }
+            if let proxyPassword { result.proxyPasswords[site.proxy.secretID] = proxyPassword }
             if section["IsWorkspace"] == "1" {
                 // "Folder/Workspace name/0000": the last component is the session index.
                 let name = path.split(separator: "/").dropLast().joined(separator: "/")
@@ -102,7 +105,8 @@ public struct WinSCPIniImporter {
         return out
     }
 
-    private func makeSite(path: String, section: IniFile.Section, usesMaster: Bool, master: String?) -> (Site, String?) {
+    private func makeSite(path: String, section: IniFile.Section, usesMaster: Bool, master: String?) -> (Site, String?, String?) {
+        var proxyPassword: String?
         func str(_ k: String) -> String { section[k].map(winscpUnmunge) ?? "" }
         func int(_ k: String) -> Int? { section[k].flatMap { Int($0) } }
 
@@ -173,10 +177,30 @@ public struct WinSCPIniImporter {
                         localDirectory: localDir, note: str("Note"), color: int("Color"),
                         hasStoredPassword: password != nil, importWarnings: warnings)
         site.sshCompression = section["Compression"] == "1"
+        // TProxyMethod: 0 none, 1 SOCKS4, 2 SOCKS5, 3 HTTP, 4 Telnet, 5 Local command
+        switch int("ProxyMethod") ?? 0 {
+        case 1: site.proxy.kind = .socks4
+        case 2: site.proxy.kind = .socks5
+        case 3: site.proxy.kind = .http
+        case 4, 5: site.importWarnings.append("Telnet/local-command proxies are not supported; the proxy was dropped.")
+        default: break
+        }
+        if site.proxy.kind != .none {
+            site.proxy.host = str("ProxyHost")
+            site.proxy.port = int("ProxyPort") ?? 1080
+            site.proxy.user = str("ProxyUsername")
+            if let enc = section["ProxyPasswordEnc"] ?? section["ProxyPassword"], !enc.isEmpty {
+                if let pw = try? WinSCPPassword.decode(enc, key: site.proxy.user + site.proxy.host) {
+                    proxyPassword = pw
+                } else {
+                    site.importWarnings.append("Proxy password could not be decoded; enter it in Advanced settings.")
+                }
+            }
+        }
         // TimeDifference is a TDateTime fraction of a day.
         if let d = section["TimeDifference"].flatMap(Double.init), d.isFinite {
             site.timeOffsetHours = (d * 24 * 100).rounded() / 100
         }
-        return (site, password)
+        return (site, password, proxyPassword)
     }
 }

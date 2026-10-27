@@ -14,10 +14,17 @@ final class AdvancedSiteSheet: NSWindowController {
     private let passive = NSButton(checkboxWithTitle: "Passive mode", target: nil, action: nil)
     private let compression = NSButton(checkboxWithTitle: "Enable SSH compression", target: nil, action: nil)
     private let timeOffset = textField(80)
+    private let proxyKind = NSPopUpButton()
+    private let proxyHost = textField(200)
+    private let proxyPort = textField(70)
+    private let proxyUser = textField(200)
+    private let proxyPassword = NSSecureTextField()
+    private let secrets: SecretStore?
 
-    init(site: Site) {
+    init(site: Site, secrets: SecretStore? = nil) {
         self.site = site
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 360), styleMask: [.titled], backing: .buffered, defer: false)
+        self.secrets = secrets
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 620, height: 440), styleMask: [.titled], backing: .buffered, defer: false)
         panel.title = "Advanced Site Settings"
         super.init(window: panel)
 
@@ -33,6 +40,15 @@ final class AdvancedSiteSheet: NSWindowController {
         compression.isEnabled = site.fileProtocol == .sftp || site.fileProtocol == .scp
         timeOffset.stringValue = site.timeOffsetHours == 0 ? "0" : String(site.timeOffsetHours)
         timeOffset.toolTip = "Hours added to remote file times, for servers that list times in another time zone."
+        ProxySettings.Kind.allCases.forEach { proxyKind.addItem(withTitle: $0.title) }
+        proxyKind.selectItem(at: ProxySettings.Kind.allCases.firstIndex(of: site.proxy.kind) ?? 0)
+        proxyHost.stringValue = site.proxy.host
+        proxyPort.stringValue = String(site.proxy.port)
+        proxyUser.stringValue = site.proxy.user
+        proxyPassword.placeholderString = secrets?.password(for: site.proxy.secretID) != nil ? "(saved in Keychain)" : nil
+        proxyPassword.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        let proxyRow = NSStackView(views: [proxyKind, proxyHost, label(":"), proxyPort])
+        let proxyAuth = NSStackView(views: [proxyUser, proxyPassword])
 
         let grid = NSGridView(views: [
             [label("Private key file:"), keyField, button("…", self, #selector(browseKey))],
@@ -43,6 +59,8 @@ final class AdvancedSiteSheet: NSWindowController {
             [NSGridCell.emptyContentView, passive, NSGridCell.emptyContentView],
             [NSGridCell.emptyContentView, compression, NSGridCell.emptyContentView],
             [label("Timezone offset (h):"), timeOffset, NSGridCell.emptyContentView],
+            [label("Proxy:"), proxyRow, NSGridCell.emptyContentView],
+            [label("Proxy user / password:"), proxyAuth, NSGridCell.emptyContentView],
         ])
         grid.translatesAutoresizingMaskIntoConstraints = false
         grid.column(at: 0).xPlacement = .trailing
@@ -93,6 +111,14 @@ final class AdvancedSiteSheet: NSWindowController {
         site.ftpPassive = passive.state == .on
         site.sshCompression = compression.state == .on
         site.timeOffsetHours = Double(timeOffset.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+        site.proxy.kind = ProxySettings.Kind.allCases[max(0, proxyKind.indexOfSelectedItem)]
+        site.proxy.host = proxyHost.stringValue.trimmingCharacters(in: .whitespaces)
+        site.proxy.port = Int(proxyPort.stringValue) ?? 1080
+        site.proxy.user = proxyUser.stringValue
+        if !proxyPassword.stringValue.isEmpty {
+            // Stored at once under the proxy's own Keychain entry, separate from the site password.
+            try? secrets?.setPassword(proxyPassword.stringValue, for: site.proxy.secretID)
+        }
         onDone?(site)
         end()
     }

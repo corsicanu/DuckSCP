@@ -190,7 +190,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         connecting.append(dialog)
         dialog.showWindow(nil)
         let hostKeys = self.hostKeys!
-        let settings = connectionSettings()
+        var settings = connectionSettings()
+        if site.proxy.isEnabled, !site.proxy.user.isEmpty { settings.proxyPassword = store.secrets.password(for: site.proxy.secretID) }
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result<RemoteSession, Error> {
                 let fs = try Connector.connect(site: site, password: password, prompter: dialog, hostKeys: hostKeys, settings: settings)

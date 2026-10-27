@@ -34,7 +34,14 @@ public final class SSHConnection {
         prompter.status("Searching for host...")
         var gaiError: Int32 = 0
         let family: Int32 = settings.ipVersion == .ipv4 ? 4 : settings.ipVersion == .ipv6 ? 6 : 0
-        let fd = macscp_tcp_connect(site.hostName, Int32(site.port), Int32(timeout * 1000), family, &gaiError)
+        let fd: Int32
+        if site.proxy.isEnabled {
+            prompter.status("Connecting through \(site.proxy.kind.title) proxy \(site.proxy.host):\(site.proxy.port)...")
+            fd = try ProxyTunnel.open(site.proxy, password: settings.proxyPassword, host: site.hostName, port: site.port,
+                                      timeout: timeout, family: family)
+        } else {
+            fd = macscp_tcp_connect(site.hostName, Int32(site.port), Int32(timeout * 1000), family, &gaiError)
+        }
         guard fd >= 0 else {
             if gaiError != 0 { throw FileSystemError(.connection, "Host \"\(site.hostName)\" does not exist.") }
             throw FileSystemError(.connection, "Network error: Connection to \"\(site.hostName)\" \(errno == ETIMEDOUT ? "timed out" : "refused").")

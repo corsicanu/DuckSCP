@@ -6,6 +6,8 @@ public struct ConnectionSettings {
     public var keepalive: Int = 30
     public var ipVersion: Preferences.IPVersion = .auto
     public var log: SessionLog?
+    /// Password of the site's proxy, read from the Keychain by the caller.
+    public var proxyPassword: String?
 
     public init() {}
 
