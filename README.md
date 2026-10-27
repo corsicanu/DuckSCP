@@ -98,6 +98,15 @@ The app follows macOS light/dark mode by default and switches live. Preferences 
 
 On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag files between panels or in from Finder.
 
+**Synchronize** (toolbar or ⌥⌘S) compares the local and remote folders recursively by modification time, size, or both. Directions:
+- **Both:** the newer side wins.
+- **Remote:** make remote match local.
+- **Local:** make local match remote.
+
+*Delete files* turns Remote/Local into a mirror. The checklist preview lets you untick single changes. A file on one side and a folder of the same name on the other is reported as a conflict and never touched. The exclude mask from Preferences applies. FTP gets a 60 s time tolerance because FTP servers list times in minutes.
+
+**Keep Remote Directory up to Date** (⌥⌘U) watches a local folder with FSEvents and uploads changes about 1 s after they settle. It can also delete remote files that were removed locally.
+
 **Lost connections** reconnect automatically: up to 3 attempts, 5 s apart, configurable under Preferences → Endurance. The interrupted operation then runs again. Queued transfers resume from their `.filepart`. The status bar shows reconnect progress.
 
 **Background transfers:** tick *Transfer in background* in the Copy/Move dialog. The item goes to the queue under the panels (toolbar **Queue** shows or hides it). Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
@@ -134,7 +143,7 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 ## Known limitations
 
-- **Not yet built:** WebDAV, S3, workspaces, Synchronize, Keep Remote Directory Up to Date, Find Files, Explorer-style interface, Preferences dialog.
+- **Not yet built:** WebDAV, S3, workspaces, Find Files, Explorer-style interface.
 - **Master password.** If the ini uses a WinSCP master password, its passwords cannot be imported.
 - **FTPS.** An accepted untrusted certificate is not pinned; you are asked again on every connect.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).

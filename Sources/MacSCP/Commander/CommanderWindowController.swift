@@ -140,10 +140,13 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         static let queue = NSToolbarItem.Identifier("queue")
         static let refresh = NSToolbarItem.Identifier("refresh")
         static let sites = NSToolbarItem.Identifier("sites")
+        static let synchronize = NSToolbarItem.Identifier("synchronize")
+        static let keepUpToDate = NSToolbarItem.Identifier("keepUpToDate")
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [ToolbarID.newSession, ToolbarID.sites, ToolbarID.disconnect, .flexibleSpace, ToolbarID.refresh, ToolbarID.queue]
+        [ToolbarID.newSession, ToolbarID.sites, ToolbarID.disconnect, .space, ToolbarID.synchronize, ToolbarID.keepUpToDate,
+         .flexibleSpace, ToolbarID.refresh, ToolbarID.queue]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -159,6 +162,8 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         case ToolbarID.disconnect: configure(item, "Disconnect", "xmark.circle", #selector(disconnect))
         case ToolbarID.refresh: configure(item, "Refresh", "arrow.clockwise", #selector(refreshAll))
         case ToolbarID.queue: configure(item, "Queue", "list.number", #selector(toggleQueue))
+        case ToolbarID.synchronize: configure(item, "Synchronize", "arrow.triangle.2.circlepath", #selector(synchronize))
+        case ToolbarID.keepUpToDate: configure(item, "Keep Up to Date", "eye", #selector(keepUpToDate))
         default: return nil
         }
         return item
@@ -265,6 +270,25 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     }
 
     @objc func toggleQueue() { transfers.toggleQueueVisible() }
+
+    private var syncController: SynchronizeController?
+    private var keepWindows: [KeepUpToDateWindow] = []
+
+    @objc func synchronize() {
+        guard let tab = current else { return NSSound.beep() }
+        let c = SynchronizeController(commander: self, tab: tab)
+        syncController = c
+        c.start { [weak self] in self?.syncController = nil }
+    }
+
+    func debugStartKeepUpToDate(remote: String) { keepWindows.last?.debugStart(remote: remote) }
+
+    @objc func keepUpToDate() {
+        guard let tab = current else { return NSSound.beep() }
+        let w = KeepUpToDateWindow(tab: tab)
+        keepWindows.append(w)
+        w.showWindow(nil)
+    }
 
     // MARK: Panel delegate
 

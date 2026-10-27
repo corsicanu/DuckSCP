@@ -32,6 +32,11 @@ enum MainMenu {
         }
         main.addItem(submenu: files, title: "Files")
 
+        let commands = NSMenu(title: "Commands")
+        commands.add("Synchronize…", #selector(CommanderWindowController.synchronize), "s", modifiers: [.command, .option])
+        commands.add("Keep Remote Directory up to Date…", #selector(CommanderWindowController.keepUpToDate), "u", modifiers: [.command, .option])
+        main.addItem(submenu: commands, title: "Commands")
+
         let view = NSMenu(title: "View")
         view.add("Show Hidden Files", #selector(AppDelegate.toggleHiddenFiles), ".", modifiers: [.command, .shift])
         main.addItem(submenu: view, title: "View")

@@ -66,6 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
                 tab.queue.add(TransferQueue.Item(upload: [file], to: out.path))
                 commander?.transfers.setQueueVisible(true)
+                // Development aid: start Keep Up to Date from the demo folder into another folder.
+                if let target = value(after: "--demo-keep", in: args), let c = commander {
+                    c.keepUpToDate()
+                    c.debugStartKeepUpToDate(remote: target)
+                }
             }
         }
 
@@ -75,7 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let snapshotDir {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            let delay = value(after: "--snapshot-delay", in: args).flatMap(Double.init) ?? 3
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 Snapshot.run(to: URL(fileURLWithPath: snapshotDir), app: self)
             }
         }
