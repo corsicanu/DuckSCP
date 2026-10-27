@@ -54,8 +54,8 @@ What is imported, per site: folder path, protocol (SFTP/SCP/FTP; WebDAV and S3 a
 
 What needs attention afterwards (marked ⚠︎ in the site tree):
 - **Windows paths.** Local directories like `C:\…` are dropped. Key files are looked up by file name in `~/.ssh`; if missing, pick them in **Advanced…**.
-- **Master password.** If the ini is protected by a WinSCP master password, sites import without passwords.
-- **Workspaces** are skipped for now.
+- **Workspaces** import as workspaces: open them from the Login tree (Login opens every session as a tab). Save your own with Session → Save Workspace (⇧⌘S).
+- **Master password:** you are asked for it and it is checked against the file's verifier, then all passwords are decrypted. Skip it to import the sites without passwords.
 
 After importing, delete the `.ini`. WinSCP only obfuscates its passwords, so anyone with the file can read them.
 
@@ -149,8 +149,8 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 ## Known limitations
 
-- **Not yet built:** WebDAV, S3, workspaces.
-- **Master password.** If the ini uses a WinSCP master password, its passwords cannot be imported.
+- **Not yet built:** WebDAV, S3.
+- **Master password** decryption follows WinSCP's AES format (WinZip-AES / fcrypt). It is verified against an independent Python implementation, not yet against a file from WinSCP itself. Every password is MAC-checked, so it either decrypts correctly or is reported as failed.
 - **FTPS.** An accepted untrusted certificate is not pinned; you are asked again on every connect.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).
 

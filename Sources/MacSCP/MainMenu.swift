@@ -17,6 +17,7 @@ enum MainMenu {
         let session = NSMenu(title: "Session")
         session.add("New Session…", #selector(AppDelegate.showLogin), "n")
         session.add("Disconnect", #selector(CommanderWindowController.disconnect), "")
+        session.add("Save Workspace…", #selector(AppDelegate.saveWorkspace), "s", modifiers: [.command, .shift])
         session.add("Refresh", #selector(CommanderWindowController.refreshAll), "r")
         main.addItem(submenu: session, title: "Session")
 

@@ -19,6 +19,7 @@ final class SessionTab {
     }
 
     var title: String { session.site.path.isEmpty ? session.site.displayTarget : session.site.name }
+    var cachedPassword: String? { (NSApp.delegate as? AppDelegate)?.passwordsForWorkspace[session.site.id] }
 }
 
 /// WinSCP's "Commander" interface: toolbar, session tabs, local and remote panels,

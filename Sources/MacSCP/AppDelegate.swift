@@ -115,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if loginWindow == nil {
             let lw = LoginWindowController(store: store, hostKeys: hostKeys)
             lw.onLogin = { [weak self] site, password in self?.openSession(site, password: password) }
+            lw.onLoginWorkspace = { [weak self] ws in self?.openWorkspace(ws) }
             loginWindow = lw
         }
         loginWindow?.showWindow(nil)
@@ -180,6 +181,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     private var connecting: [ConnectingWindow] = []
+    /// Passwords used by open sessions (memory only), so Save Workspace can store them.
+    var passwordsForWorkspace: [UUID: String] = [:]
 
     /// Connects in the background behind WinSCP's progress dialog, then opens a tab.
     func openSession(_ site: Site, password: String?) {
@@ -203,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 connecting.removeAll { $0 === dialog }
                 switch result {
                 case .success(let session):
+                    passwordsForWorkspace[site.id] = dialog.cached.password // main thread only
                     attach(session)
                 case .failure(let error):
                     if (error as? FileSystemError)?.code == .cancelled { return }
@@ -214,6 +218,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     showLogin()
                 }
             }
+        }
+    }
+
+    func openWorkspace(_ ws: Workspace) {
+        for site in ws.sites where site.fileProtocol.isSupported {
+            openSession(site, password: site.hasStoredPassword ? store.secrets.password(for: site.id) : nil)
+        }
+    }
+
+    /// Session → Save Workspace: stores the open tabs with their current folders.
+    @objc func saveWorkspace() {
+        guard let c = commander, !c.tabs.isEmpty else { return NSSound.beep() }
+        let a = NSAlert()
+        a.messageText = "Save workspace"
+        a.informativeText = "Saves the \(c.tabs.count) open session(s) with their current folders."
+        a.addButton(withTitle: "Save")
+        a.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = "My Workspace"
+        let savePasswords = NSButton(checkboxWithTitle: "Save passwords (Keychain)", target: nil, action: nil)
+        savePasswords.state = .on
+        let stack = NSStackView(views: [field, savePasswords])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.frame = NSRect(x: 0, y: 0, width: 260, height: 50)
+        a.accessoryView = stack
+        guard a.runModal() == .alertFirstButtonReturn, !field.stringValue.isEmpty else { return }
+        var passwords: [UUID: String] = [:]
+        let sites: [Site] = c.tabs.map { tab in
+            var s = tab.session.site
+            let originalID = s.id
+            s.id = UUID()
+            s.remoteDirectory = tab.remote.path
+            s.localDirectory = tab.local.path
+            if savePasswords.state == .on, let pw = tab.cachedPassword ?? store.secrets.password(for: originalID) { passwords[s.id] = pw }
+            return s
+        }
+        do {
+            try store.saveWorkspace(Workspace(name: field.stringValue, sites: sites), passwords: passwords)
+            loginWindow?.reloadTree(select: nil)
+        } catch {
+            showError(error, in: c.window)
         }
     }
 

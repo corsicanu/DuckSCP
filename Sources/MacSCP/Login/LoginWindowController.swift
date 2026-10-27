@@ -4,7 +4,7 @@ import SCPCore
 /// The WinSCP "Login" dialog: site tree on the left, session settings on the right.
 final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSWindowDelegate {
     private final class Node {
-        enum Kind { case newSite, folder(String), site(UUID) }
+        enum Kind { case newSite, folder(String), site(UUID), workspace(UUID) }
         let kind: Kind
         let title: String
         var children: [Node] = []
@@ -15,6 +15,8 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     let hostKeys: HostKeyStore
     /// Called with the edited (possibly unsaved) site and the password to use.
     var onLogin: ((Site, String?) -> Void)?
+    /// Opens every session of a workspace.
+    var onLoginWorkspace: ((Workspace) -> Void)?
 
     private var root: [Node] = []
     private var draft = Site(path: "")
@@ -217,6 +219,9 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             for n in nodes { sortNodes(&n.children) }
         }
         sortNodes(&top)
+        // Workspaces after the sites, like WinSCP's tree.
+        top += store.workspaces.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .map { Node(.workspace($0.id), $0.name) }
         root = top
         outline.reloadData()
         outline.expandItem(nil, expandChildren: true)
@@ -230,7 +235,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             switch node.kind {
             case .newSite: match = id == nil
             case .site(let sid): match = sid == id
-            case .folder: match = false
+            case .folder, .workspace: match = false
             }
             if match {
                 outline.selectRowIndexes([row], byExtendingSelection: false)
@@ -261,6 +266,10 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         let text = NSTextField(labelWithString: node.title)
         switch node.kind {
         case .newSite: image.image = NSImage(systemSymbolName: "plus.rectangle.on.rectangle", accessibilityDescription: nil)
+        case .workspace(let id):
+            image.image = NSImage(systemSymbolName: "rectangle.stack", accessibilityDescription: nil)
+            image.contentTintColor = .systemTeal
+            text.toolTip = store.workspaces.first { $0.id == id }.map { $0.sites.map(\.displayTarget).joined(separator: "\n") }
         case .folder: image.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
             image.contentTintColor = .systemYellow
         case .site(let id):
@@ -299,6 +308,11 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         case .folder(let path)?:
             selectedID = nil
             draft = Site(path: path + "/")
+        case .workspace(let id)?:
+            selectedID = nil
+            let ws = store.workspaces.first { $0.id == id }
+            draft = ws?.sites.first ?? Site(path: "")
+            draft.importWarnings = ["Workspace: \(ws?.sites.count ?? 0) session(s): " + (ws?.sites.map(\.displayTarget).joined(separator: ", ") ?? "")]
         default:
             selectedID = nil
             draft = Site(path: "")
@@ -350,6 +364,10 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
     // MARK: - Actions
 
     @objc func login() {
+        if case .workspace(let id)? = selectedNode?.kind, let ws = store.workspaces.first(where: { $0.id == id }) {
+            onLoginWorkspace?(ws)
+            return
+        }
         readFields()
         guard !draft.hostName.isEmpty else {
             NSSound.beep()
@@ -455,6 +473,9 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         case .folder(let path)?:
             target = "folder \"\(path)\" and all its sites"
             action = { try self.store.deleteFolder(path) }
+        case .workspace(let id)?:
+            target = "workspace \"\(store.workspaces.first { $0.id == id }?.name ?? "")\""
+            action = { try self.store.deleteWorkspace(id) }
         default:
             return NSSound.beep()
         }
@@ -498,7 +519,12 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
 
     func importIni(at url: URL) {
         do {
-            let result = try WinSCPIniImporter().importFile(at: url)
+            let data = try Data(contentsOf: url)
+            var master: String?
+            if WinSCPIniImporter.usesMasterPassword(data) {
+                master = askMasterPassword(data)
+            }
+            let result = WinSCPIniImporter().importData(data, masterPassword: master)
             let count = try store.merge(result)
             let keyCount = hostKeys.importWinSCP(result.hostKeys)
             var prefsApplied: [String] = []
@@ -522,6 +548,27 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         } catch {
             showError(error, in: window)
         }
+    }
+
+    /// Asks for the WinSCP master password until it matches the file's verifier (or the user skips).
+    private func askMasterPassword(_ data: Data) -> String? {
+        var prompt = "This WinSCP.ini protects its passwords with a master password. Enter it to import the passwords, or skip to import the sites without them."
+        for _ in 0..<5 {
+            let a = NSAlert()
+            a.messageText = "WinSCP master password"
+            a.informativeText = prompt
+            a.addButton(withTitle: "Import")
+            a.addButton(withTitle: "Skip Passwords")
+            let field = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+            a.accessoryView = field
+            a.window.initialFirstResponder = field
+            guard a.runModal() == .alertFirstButtonReturn else { return nil }
+            switch WinSCPIniImporter.checkMasterPassword(field.stringValue, in: data) {
+            case false?: prompt = "Incorrect master password. Try again, or skip to import the sites without passwords."
+            default: return field.stringValue // verified, or no verifier: each password is MAC-checked anyway
+            }
+        }
+        return nil
     }
 
     @objc private func closeWindow() { window?.close() }

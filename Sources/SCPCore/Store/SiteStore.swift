@@ -3,6 +3,8 @@ import Foundation
 /// Persists sites as JSON (owner-only permissions) and passwords via a `SecretStore`.
 public final class SiteStore {
     public private(set) var sites: [Site] = []
+    public private(set) var workspaces: [Workspace] = []
+    private var workspacesURL: URL { fileURL.deletingLastPathComponent().appendingPathComponent("workspaces.json") }
     public let fileURL: URL
     public let secrets: SecretStore
 
@@ -18,8 +20,8 @@ public final class SiteStore {
     }
 
     public func load() {
-        guard let data = try? Data(contentsOf: fileURL) else { sites = []; return }
-        sites = (try? JSONDecoder().decode([Site].self, from: data)) ?? []
+        sites = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode([Site].self, from: $0) } ?? []
+        workspaces = (try? Data(contentsOf: workspacesURL)).flatMap { try? JSONDecoder().decode([Workspace].self, from: $0) } ?? []
     }
 
     public func save() throws {
@@ -32,6 +34,8 @@ public final class SiteStore {
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try enc.encode(sites).write(to: fileURL, options: [.atomic])
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+        try enc.encode(workspaces).write(to: workspacesURL, options: [.atomic])
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: workspacesURL.path)
     }
 
     public func site(_ id: UUID) -> Site? { sites.first { $0.id == id } }
@@ -75,13 +79,48 @@ public final class SiteStore {
         return "\(path) (\(n))"
     }
 
-    /// Adds imported sites, renaming on clash, and stores their passwords.
+    /// Saves (or replaces, by name) a workspace. `passwords` are keyed by the sites' ids.
+    public func saveWorkspace(_ workspace: Workspace, passwords: [UUID: String] = [:]) throws {
+        if let old = workspaces.first(where: { $0.name == workspace.name }) {
+            for s in old.sites { try secrets.setPassword(nil, for: s.id) }
+            workspaces.removeAll { $0.name == workspace.name }
+        }
+        var ws = workspace
+        for i in ws.sites.indices {
+            let pw = passwords[ws.sites[i].id]
+            ws.sites[i].hasStoredPassword = pw != nil
+            if let pw { try secrets.setPassword(pw, for: ws.sites[i].id) }
+        }
+        workspaces.append(ws)
+        try save()
+    }
+
+    public func deleteWorkspace(_ id: UUID) throws {
+        for s in workspaces.first(where: { $0.id == id })?.sites ?? [] { try secrets.setPassword(nil, for: s.id) }
+        workspaces.removeAll { $0.id == id }
+        try save()
+    }
+
+    /// Adds imported sites and workspaces, renaming on clash, and stores their passwords.
+    /// Everything gets fresh ids, so importing the same file twice yields independent copies.
     @discardableResult
     public func merge(_ result: WinSCPIniImporter.Result) throws -> Int {
-        for var site in result.sites {
-            site.path = uniquePath(site.path)
-            if let pw = result.passwords[site.id] { try secrets.setPassword(pw, for: site.id) }
-            sites.append(site)
+        func fresh(_ site: Site) throws -> Site {
+            var copy = site
+            copy.id = UUID()
+            if let pw = result.passwords[site.id] { try secrets.setPassword(pw, for: copy.id) }
+            return copy
+        }
+        for site in result.sites {
+            var copy = try fresh(site)
+            copy.path = uniquePath(site.path)
+            sites.append(copy)
+        }
+        for ws in result.workspaces {
+            var copy = Workspace(name: ws.name, sites: try ws.sites.map(fresh))
+            var n = 2
+            while workspaces.contains(where: { $0.name == copy.name }) { copy.name = "\(ws.name) (\(n))"; n += 1 }
+            workspaces.append(copy)
         }
         try save()
         return result.sites.count

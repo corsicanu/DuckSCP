@@ -4,8 +4,9 @@ import Foundation
 public struct WinSCPIniImporter {
     public struct Result {
         public var sites: [Site] = []
-        /// Decoded passwords keyed by site id. Callers move these into the Keychain.
+        /// Decoded passwords keyed by site id (sites and workspace entries). Callers move these into the Keychain.
         public var passwords: [UUID: String] = [:]
+        public var workspaces: [Workspace] = []
         /// Raw `[SshHostKeys]` entries, e.g. "ssh-ed25519@22:host" -> "0x..,0x..".
         public var hostKeys: [(key: String, value: String)] = []
         /// File-level messages (master password, skipped workspaces, ...).
@@ -21,37 +22,51 @@ public struct WinSCPIniImporter {
         self.keySearchDirectories = keySearchDirectories
     }
 
-    public func importFile(at url: URL) throws -> Result {
-        try importData(Data(contentsOf: url))
+    public func importFile(at url: URL, masterPassword: String? = nil) throws -> Result {
+        try importData(Data(contentsOf: url), masterPassword: masterPassword)
     }
 
-    public func importData(_ data: Data) -> Result {
+    /// Whether the file's passwords are encrypted with a WinSCP master password.
+    public static func usesMasterPassword(_ data: Data) -> Bool {
+        IniFile(data: data).section("Configuration\\Security")?["UseMasterPassword"] == "1"
+    }
+
+    /// nil = file has no verifier or uses no master password; false = wrong password.
+    public static func checkMasterPassword(_ password: String, in data: Data) -> Bool? {
+        guard let v = IniFile(data: data).section("Configuration\\Security")?["MasterPasswordVerifier"] else { return nil }
+        return WinSCPMasterPassword.verify(password, verifierHex: v)
+    }
+
+    public func importData(_ data: Data, masterPassword: String? = nil) -> Result {
         let ini = IniFile(data: data)
         var result = Result()
 
-        let masterPassword = ini.section("Configuration\\Security")?["UseMasterPassword"] == "1"
-        if masterPassword {
+        let usesMaster = ini.section("Configuration\\Security")?["UseMasterPassword"] == "1"
+        if usesMaster && masterPassword == nil {
             result.messages.append("This WinSCP.ini is protected by a master password. Sites were imported without passwords; enter them on first login.")
         }
+        let master = usesMaster ? masterPassword : nil
 
-        var skippedWorkspaces = Set<String>()
+        var workspaces: [String: [Site]] = [:]
+        var workspaceOrder: [String] = []
         for section in ini.sections {
             let prefix = "Sessions\\"
             guard section.name.lowercased().hasPrefix(prefix.lowercased()) else { continue }
             let rawName = String(section.name.dropFirst(prefix.count))
             let path = rawName.split(separator: "/").map { winscpUnmunge(String($0)) }.joined(separator: "/")
             if path.isEmpty || path == "Default Settings" { continue }
+            let (site, password) = makeSite(path: path, section: section, usesMaster: usesMaster, master: master)
+            if let password { result.passwords[site.id] = password }
             if section["IsWorkspace"] == "1" {
-                skippedWorkspaces.insert(path.split(separator: "/").first.map(String.init) ?? path)
+                // "Folder/Workspace name/0000": the last component is the session index.
+                let name = path.split(separator: "/").dropLast().joined(separator: "/")
+                if workspaces[name] == nil { workspaceOrder.append(name) }
+                workspaces[name, default: []].append(site)
                 continue
             }
-            let (site, password) = makeSite(path: path, section: section, masterPassword: masterPassword)
             result.sites.append(site)
-            if let password { result.passwords[site.id] = password }
         }
-        if !skippedWorkspaces.isEmpty {
-            result.messages.append("Skipped workspaces (not supported yet): \(skippedWorkspaces.sorted().joined(separator: ", ")).")
-        }
+        result.workspaces = workspaceOrder.map { Workspace(name: $0, sites: workspaces[$0] ?? []) }
         if let keys = ini.section("SshHostKeys") {
             result.hostKeys = keys.entries
         }
@@ -87,7 +102,7 @@ public struct WinSCPIniImporter {
         return out
     }
 
-    private func makeSite(path: String, section: IniFile.Section, masterPassword: Bool) -> (Site, String?) {
+    private func makeSite(path: String, section: IniFile.Section, usesMaster: Bool, master: String?) -> (Site, String?) {
         func str(_ k: String) -> String { section[k].map(winscpUnmunge) ?? "" }
         func int(_ k: String) -> Int? { section[k].flatMap { Int($0) } }
 
@@ -137,11 +152,17 @@ public struct WinSCPIniImporter {
         let host = str("HostName")
         let user = str("UserName")
         var password: String?
-        if let enc = section["Password"], !enc.isEmpty, !masterPassword {
-            do {
-                password = try WinSCPPassword.decode(enc, key: user + host)
-            } catch {
-                warnings.append("Stored password could not be decoded.")
+        if let enc = section["Password"], !enc.isEmpty {
+            if WinSCPMasterPassword.isEncrypted(enc) {
+                if let master {
+                    do { password = try WinSCPMasterPassword.decrypt(enc, masterPassword: master, key: user + host) } catch {
+                        warnings.append("Stored password could not be decrypted with the master password.")
+                    }
+                }
+            } else if !usesMaster || master != nil {
+                do { password = try WinSCPPassword.decode(enc, key: user + host) } catch {
+                    warnings.append("Stored password could not be decoded.")
+                }
             }
         }
 

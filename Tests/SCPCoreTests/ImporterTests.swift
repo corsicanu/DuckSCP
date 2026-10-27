@@ -42,7 +42,8 @@ private func fixture() throws -> Data {
             "Production/web-01", "Production/db server", "Staging/ftp.example.org",
             "Clients/Acme/legacy-ftp", "localhost test", "webdav box", "s3 bucket",
         ])
-        #expect(result.messages.contains { $0.contains("My Workspace") })
+        #expect(result.workspaces.map(\.name) == ["My Workspace"])
+        #expect(result.workspaces.first?.sites.first?.hostName == "web01.example.com")
     }
 
     @Test func decodesPasswordsFromPythonGenerator() throws {
