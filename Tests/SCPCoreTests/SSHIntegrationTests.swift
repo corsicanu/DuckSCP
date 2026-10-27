@@ -24,6 +24,52 @@ final class TestPrompter: ConnectionPrompter {
     }
     func askPassword(_ prompt: String) -> String? { nil }
     func askPassphrase(keyPath: String) -> String? { passphraseAsked += 1; return passphrase }
+
+    var acceptCertificate = false
+    var certificateAsked = 0
+    func confirmUntrustedCertificate(host: String, message: String) -> Bool {
+        certificateAsked += 1
+        return acceptCertificate
+    }
+}
+
+/// Exercises every RemoteFileSystem operation inside a fresh folder under `parent`.
+func exerciseFileSystem(_ fs: RemoteFileSystem, parent: String, expectOwner: String? = nil) throws {
+    let base = RemotePath.join(parent, UUID().uuidString)
+    try fs.makeDirectory(base)
+    defer { try? RecursiveOps.delete(base, entry: RemoteEntry(name: "", kind: .directory), fs: fs) }
+
+    let localSrc = FileManager.default.temporaryDirectory.appendingPathComponent("src-\(UUID().uuidString)")
+    let payload = Data((0..<200_000).map { UInt8($0 % 253) })
+    try payload.write(to: localSrc)
+    try fs.upload(localSrc, to: base + "/it's a #file.bin", offset: 0) { _ in true }
+
+    let listed = try fs.list(base)
+    #expect(listed.map(\.name) == ["it's a #file.bin"])
+    #expect(listed.first?.size == 200_000)
+    if let expectOwner { #expect(listed.first?.owner == expectOwner) }
+
+    try fs.rename(base + "/it's a #file.bin", to: base + "/b.bin")
+    try fs.setPermissions(base + "/b.bin", 0o640)
+    let when = Date(timeIntervalSince1970: 1_500_000_000)
+    try fs.setModificationDate(base + "/b.bin", when)
+    let st = try fs.stat(base + "/b.bin")
+    if st.permissions != nil { #expect(st.permissions == 0o640) } // pyftpdlib omits unix.mode
+    #expect(st.modified == when)
+
+    let localDst = FileManager.default.temporaryDirectory.appendingPathComponent("dst-\(UUID().uuidString)")
+    try fs.download(base + "/b.bin", to: localDst, offset: 0) { _ in true }
+    #expect(try Data(contentsOf: localDst) == payload)
+
+    // Resume: download the rest of a partial file.
+    let partial = FileManager.default.temporaryDirectory.appendingPathComponent("part-\(UUID().uuidString)")
+    try payload.prefix(50_000).write(to: partial)
+    try fs.download(base + "/b.bin", to: partial, offset: 50_000) { _ in true }
+    #expect(try Data(contentsOf: partial) == payload)
+
+    #expect(throws: FileSystemError.self) { try fs.stat(base + "/missing") }
+    try fs.removeFile(base + "/b.bin")
+    #expect(try fs.list(base).isEmpty)
 }
 
 @Suite(.enabled(if: sshDir != nil, "start scripts/test_sshd.sh"), .serialized)
@@ -45,37 +91,8 @@ struct SSHIntegrationTests {
         try Connector.connect(site: site(proto, key: key), password: nil, prompter: prompter, hostKeys: hostKeys)
     }
 
-    /// Exercises every RemoteFileSystem operation inside a fresh folder.
     func roundTrip(_ fs: RemoteFileSystem) throws {
-        let base = dir.appendingPathComponent("home").path + "/" + UUID().uuidString
-        try fs.makeDirectory(base)
-        defer { try? RecursiveOps.delete(base, entry: RemoteEntry(name: "", kind: .directory), fs: fs) }
-
-        let localSrc = FileManager.default.temporaryDirectory.appendingPathComponent("src-\(UUID().uuidString)")
-        let payload = Data((0..<200_000).map { UInt8($0 % 253) })
-        try payload.write(to: localSrc)
-        try fs.upload(localSrc, to: base + "/it's a file.bin", offset: 0) { _ in true }
-
-        let listed = try fs.list(base)
-        #expect(listed.map(\.name) == ["it's a file.bin"])
-        #expect(listed.first?.size == 200_000)
-        #expect(listed.first?.owner == NSUserName())
-
-        try fs.rename(base + "/it's a file.bin", to: base + "/b.bin")
-        try fs.setPermissions(base + "/b.bin", 0o640)
-        let when = Date(timeIntervalSince1970: 1_500_000_000)
-        try fs.setModificationDate(base + "/b.bin", when)
-        let st = try fs.stat(base + "/b.bin")
-        #expect(st.permissions == 0o640)
-        #expect(st.modified == when)
-
-        let localDst = FileManager.default.temporaryDirectory.appendingPathComponent("dst-\(UUID().uuidString)")
-        try fs.download(base + "/b.bin", to: localDst, offset: 0) { _ in true }
-        #expect(try Data(contentsOf: localDst) == payload)
-
-        #expect(throws: FileSystemError.self) { try fs.stat(base + "/missing") }
-        try fs.removeFile(base + "/b.bin")
-        #expect(try fs.list(base).isEmpty)
+        try exerciseFileSystem(fs, parent: dir.appendingPathComponent("home").path, expectOwner: NSUserName())
     }
 
     @Test func sftpRoundTrip() throws {

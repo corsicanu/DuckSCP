@@ -117,6 +117,7 @@ public enum RemotePath {
     /// Rejects names that would escape the target directory or are invalid on POSIX.
     /// Used for every name received from a server before writing locally.
     public static func isSafeName(_ name: String) -> Bool {
-        !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0")
+        !name.isEmpty && name != "." && name != ".."
+            && !name.unicodeScalars.contains { $0 == "/" || $0 == "\0" }
     }
 }

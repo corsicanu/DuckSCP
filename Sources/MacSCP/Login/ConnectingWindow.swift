@@ -122,6 +122,20 @@ final class ConnectingWindow: NSWindowController, ConnectionPrompter {
         }
     }
 
+    func confirmUntrustedCertificate(host: String, message: String) -> Bool {
+        let ok: Bool = onMain {
+            let a = NSAlert()
+            a.alertStyle = .critical
+            a.messageText = "The server's certificate is not trusted."
+            a.informativeText = "\(message)\n\nConnecting anyway means the connection to \(host) could be intercepted. This choice applies to this session only."
+            a.addButton(withTitle: "Cancel")
+            a.addButton(withTitle: "Connect Anyway")
+            return a.runModal() == .alertSecondButtonReturn
+        }
+        if ok { cached.acceptedUntrustedCertificate = true }
+        return ok
+    }
+
     func askPassword(_ prompt: String) -> String? {
         let value = secret(title: "Password - \(site.displayTarget)", prompt: prompt)
         if let value {

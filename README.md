@@ -14,7 +14,7 @@ It imports your existing `WinSCP.ini` sites, including saved passwords.
 | 2 | Commander window: session tabs, local/remote panels, F-key commands, transfer engine | ✅ |
 | 3 | SFTP / SCP (libssh2): host-key checks, passwords, OpenSSH + PuTTY keys, ssh-agent | ✅ |
 | 4 | Transfer queue on a second connection, progress dialog, overwrite prompts, resume | ✅ |
-| 5 | FTP / FTPS (libcurl) | ⏳ |
+| 5 | FTP / FTPS (implicit and explicit TLS, passive and active) over system libcurl | ✅ |
 
 ## Build and run
 
@@ -36,7 +36,13 @@ Runs the unit tests. For the SSH integration tests, first start a throwaway loca
 scripts/test_sshd.sh start
 ```
 
-Without it, those tests are skipped.
+For the FTP/FTPS tests, start a throwaway pyftpdlib server (`127.0.0.1:2121`, user `tester` / `secret`). The first run needs network access to install it into a private venv:
+
+```bash
+scripts/test_ftpd.sh start
+```
+
+Without these servers, the integration tests are skipped.
 
 ## Importing WinSCP.ini
 
@@ -80,6 +86,7 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - **Authentication order:** private key from the site settings, then ssh-agent, then keyboard-interactive and password. You are prompted if no password is stored.
 - **Keys:** OpenSSH and PEM keys, encrypted or not. PuTTY `.ppk` v2 and v3 unencrypted, and v2 encrypted. Encrypted v3 `.ppk` files use Argon2; convert those with PuTTYgen → Conversions → Export OpenSSH key.
 - **SCP mode** runs `ls`, `mv`, `rm`, `chmod` and `touch` on the server, so it needs a POSIX shell, like WinSCP's SCP mode. Listings use `TZ=UTC` and the most precise date format the server's `ls` supports.
+- **FTP/FTPS** uses the system libcurl with macOS's trust store. Listings use MLSD, then fall back to `LIST -a` and `LIST` (Unix and Windows/IIS formats). Untrusted certificates ask *Connect Anyway / Cancel*; the answer lasts for that session only and is never saved.
 - **Host keys** are checked against MacSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
 
 ## Security
@@ -90,6 +97,7 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - File names received from servers are validated before anything is written locally, so `../` and `/` cannot escape the target folder.
 - New local files are created with `O_NOFOLLOW`, so a planted symlink is never followed.
 - SCP shell arguments are always single-quoted.
+- FTP commands containing CR, LF or NUL are refused, so file names cannot inject extra FTP commands.
 - The app is signed with the hardened runtime.
 
 ## Developer notes

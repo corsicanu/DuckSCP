@@ -104,6 +104,7 @@ import Testing
         #expect(RemotePath.parent("/a") == "/")
         #expect(RemotePath.join("/", "x") == "/x")
         #expect(!RemotePath.isSafeName("..") && !RemotePath.isSafeName("a/b") && RemotePath.isSafeName("a b"))
+        #expect(!RemotePath.isSafeName("a\u{0}b"))
     }
 }
 

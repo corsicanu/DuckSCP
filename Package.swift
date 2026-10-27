@@ -19,7 +19,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "CLibSSH2", path: "Sources/CLibSSH2", linkerSettings: staticSSH),
-        .target(name: "SCPCore", dependencies: ["CLibSSH2"], path: "Sources/SCPCore"),
+        // System libcurl (SecureTransport TLS, macOS trust store) for FTP/FTPS.
+        .target(name: "CCurl", path: "Sources/CCurl", linkerSettings: [.linkedLibrary("curl")]),
+        .target(name: "SCPCore", dependencies: ["CLibSSH2", "CCurl"], path: "Sources/SCPCore"),
         .executableTarget(name: "MacSCP", dependencies: ["SCPCore"], path: "Sources/MacSCP"),
         .testTarget(name: "SCPCoreTests", dependencies: ["SCPCore"], path: "Tests/SCPCoreTests",
                     resources: [.copy("Fixtures")]),

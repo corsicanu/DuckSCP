@@ -10,6 +10,12 @@ public protocol ConnectionPrompter: AnyObject {
     func askPassword(_ prompt: String) -> String?
     func askPassphrase(keyPath: String) -> String?
     func banner(_ text: String)
+    /// FTPS: the server certificate failed verification. True = connect anyway (this session only).
+    func confirmUntrustedCertificate(host: String, message: String) -> Bool
+}
+
+public extension ConnectionPrompter {
+    func confirmUntrustedCertificate(host: String, message: String) -> Bool { false }
 }
 
 /// An authenticated libssh2 session over a TCP socket.

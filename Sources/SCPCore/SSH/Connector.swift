@@ -18,7 +18,9 @@ public enum Connector {
         case .scp:
             let conn = try SSHConnection.open(site: site, password: password, prompter: prompter, hostKeys: hostKeys)
             return SCPFileSystem(connection: conn)
-        case .ftp, .webdav, .s3:
+        case .ftp:
+            return try FTPFileSystem.connect(site: site, password: password, prompter: prompter)
+        case .webdav, .s3:
             throw FileSystemError(.unsupported, "\(site.fileProtocol.title) is not supported yet.")
         }
     }
