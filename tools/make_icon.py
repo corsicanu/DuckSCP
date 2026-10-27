@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Builds the app icon set and README logo from branding/logo-source.jpg.
+"""Builds the app icon set and README logo from branding/logo-source.png.
 
 - Crops the large icon, cuts it out with a rounded-rectangle mask (removes the
   blurred photo background), upscales with Lanczos, sharpens slightly, and centres
@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "branding" / "logo-source.jpg"
+SRC = ROOT / "branding" / "logo-source.png"
 OUT = ROOT / "branding"
 
 src = Image.open(SRC).convert("RGB")
@@ -57,9 +57,24 @@ for pt in (16, 32, 128, 256, 512):
             img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=80, threshold=1))
         img.save(iconset / f"icon_{pt}x{pt}{'@2x' if mult == 2 else ''}.png")
 
-# README logo: small round icon + "DuckSCP / WinSCP Client for macOS" wordmark.
+# README logo: small round icon + "DuckSCP" wordmark with our own tagline.
+# The source image's tagline names WinSCP (a third-party trademark), so it is painted
+# over with the background colour and redrawn.
+from PIL import ImageFont
+TAGLINE = "SFTP, FTP & S3 client for macOS"
+TAG_BOX = (900, 412, 1345, 462)      # old tagline area in the source
+TAG_INK = (88, 88, 90)
+wm = src.copy()
+draw = ImageDraw.Draw(wm)
+draw.rectangle(TAG_BOX, fill=(246, 246, 243))
+size = 40
+font = ImageFont.truetype("/System/Library/Fonts/HelveticaNeue.ttc", size)
+while draw.textlength(TAGLINE, font=font) > TAG_BOX[2] - TAG_BOX[0] - 8:
+    size -= 1
+    font = ImageFont.truetype("/System/Library/Fonts/HelveticaNeue.ttc", size)
+draw.text((905, 437), TAGLINE, font=font, fill=TAG_INK, anchor="lm")
 WORDMARK = (682, 282, 1348, 488)
-logo = src.crop(WORDMARK)
+logo = wm.crop(WORDMARK)
 logo = logo.resize((logo.width * 2, logo.height * 2), Image.LANCZOS)
 logo = logo.filter(ImageFilter.UnsharpMask(radius=2, percent=70, threshold=2))
 logo.save(OUT / "logo.png")

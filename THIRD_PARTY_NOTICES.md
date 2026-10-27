@@ -14,4 +14,4 @@ Apache-2.0 is compatible with GPL-3.0, but not with GPL-2.0. That is why DuckSCP
 
 The test helpers in `tools/` and `scripts/` install pyftpdlib, pyOpenSSL, WsgiDAV, cheroot, moto and Pillow into a private virtual environment. They are used only to run tests and generate icons, and are not shipped with the app.
 
-"WinSCP" is a trademark of its authors. DuckSCP is not affiliated with or endorsed by the WinSCP project and contains no WinSCP source code. File formats (WinSCP.ini, PuTTY .ppk) are implemented from their observable structure for interoperability.
+"WinSCP" is a trademark of its owner, Martin Přikryl. DuckSCP is not affiliated with, endorsed or supported by WinSCP or its author, and contains no WinSCP source code. File formats (WinSCP.ini, PuTTY .ppk) are implemented from their observable structure for interoperability.

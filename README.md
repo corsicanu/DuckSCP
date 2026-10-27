@@ -5,8 +5,28 @@
 A native macOS file transfer client modelled on WinSCP's interface and behaviour: SFTP, SCP, FTP/FTPS, WebDAV and S3.
 It imports your existing `WinSCP.ini` sites, including saved passwords, workspaces and preferences.
 
-> "WinSCP" is a trademark of its authors. DuckSCP is an independent project, not affiliated with or endorsed by WinSCP, and contains no WinSCP code.
-> The product name, bundle id and version live in [`branding.env`](branding.env); the icon is generated from [`branding/logo-source.jpg`](branding/logo-source.jpg) by [`tools/make_icon.py`](tools/make_icon.py).
+> [!IMPORTANT]
+> **DuckSCP is not WinSCP.** It is an independent project with no affiliation with WinSCP or its author. WinSCP does not endorse, sponsor or support it, and DuckSCP contains no WinSCP source code.
+> "WinSCP" is a trademark of its owner, Martin Přikryl, the author of WinSCP ([winscp.net](https://winscp.net)). The name appears here only to describe compatibility: DuckSCP can import WinSCP's configuration file and follows its layout. For WinSCP itself, go to winscp.net.
+
+## Why DuckSCP exists
+
+DuckSCP is **AI-built**: it was designed and written with an AI coding assistant (Claude), directed and reviewed by me.
+
+It was born out of necessity. I needed a good FTP/SFTP client on the Mac, and none of the ones I tried met my personal needs. I wanted:
+- WinSCP's two-panel workflow
+- my existing WinSCP sites, imported with their passwords
+- folders listed first
+- huge directories that list without limits
+- a sane F4 "edit and upload on save"
+
+So I built the one I wanted.
+
+## The name
+
+The working name was **MacSCP**. In Romanian, *mac* (as in "mac-mac") is the sound a duck makes. So MacSCP became **DuckSCP**, and the icon followed the name change: a rubber duck guarding the transfer arrows.
+
+The product name, bundle id and version live in [`branding.env`](branding.env). The icon is generated from [`branding/logo-source.png`](branding/logo-source.png) by [`tools/make_icon.py`](tools/make_icon.py).
 
 ## Status
 
