@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Throwaway FTP + explicit FTPS server for integration tests (pyftpdlib).
 
 Usage: test_ftpd.py <root-dir> <port> <certfile>

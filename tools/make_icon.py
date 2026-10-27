@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Builds the app icon set and README logo from branding/logo-source.jpg.
 
 - Crops the large icon, cuts it out with a rounded-rectangle mask (removes the

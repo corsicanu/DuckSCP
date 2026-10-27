@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Starts a throwaway OpenSSH server on 127.0.0.1:${PORT:-2222} as the current user,
 # for integration tests. Key-based login only. State lives in $DIR (default: a temp dir).
 # Usage: scripts/test_sshd.sh start|stop|env

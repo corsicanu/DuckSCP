@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// WebDAV (RFC 4918) over HTTP or HTTPS ("Encryption: TLS" in the Login dialog).

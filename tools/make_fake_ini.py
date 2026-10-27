@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Generate a fake WinSCP.ini for tests and demos.
 
 Independent Python implementation of WinSCP's simple password obfuscation,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// WinSCP's "simple" password obfuscation used for passwords stored in WinSCP.ini

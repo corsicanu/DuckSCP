@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// Amazon S3 and S3-compatible storage (MinIO, Wasabi, R2...), path-style addressing.

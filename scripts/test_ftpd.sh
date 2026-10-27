@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Starts a throwaway FTP/FTPS server on 127.0.0.1:${PORT:-2121} and a SOCKS/HTTP proxy on PORT+1000
 # for integration tests.
 # Needs network once to install pyftpdlib into a private venv.

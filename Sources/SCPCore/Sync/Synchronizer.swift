@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// WinSCP's Synchronize: compares a local and a remote directory tree and

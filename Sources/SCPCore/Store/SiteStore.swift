@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// Persists sites as JSON (owner-only permissions) and passwords via a `SecretStore`.

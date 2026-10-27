@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds a release .app bundle into build/ and (with --install) copies it to ~/Applications.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -14,6 +15,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
 # App icon from branding/AppIcon.iconset (regenerate with tools/make_icon.py).
 iconutil -c icns branding/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+# GPL and the licenses of statically linked libraries travel with the binary.
+mkdir -p "$APP/Contents/Resources/licenses"
+cp LICENSE THIRD_PARTY_NOTICES.md licenses/*.txt "$APP/Contents/Resources/licenses/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

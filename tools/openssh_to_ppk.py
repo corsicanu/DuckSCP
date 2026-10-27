@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Convert an unencrypted OpenSSH private key (ed25519 or rsa) to PuTTY PPK v2.
 
 Test helper: an independent implementation of the PPK format so the Swift

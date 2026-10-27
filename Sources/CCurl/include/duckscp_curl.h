@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Non-variadic wrappers for libcurl (Swift cannot call curl_easy_setopt directly).
 #ifndef DUCKSCP_CURL_H
 #define DUCKSCP_CURL_H

@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Runs the unit tests. Works with Command Line Tools only (no Xcode):
 # the swift-testing macro plugin lives in a subfolder SwiftPM does not search.
 # Builds outside the repo because ~/Desktop may carry Finder xattrs that break codesign.

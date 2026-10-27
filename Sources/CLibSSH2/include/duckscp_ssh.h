@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Thin C helpers around libssh2: wraps macros Swift cannot call and keeps
 // callback plumbing (keyboard-interactive) out of Swift.
 #ifndef DUCKSCP_SSH_H

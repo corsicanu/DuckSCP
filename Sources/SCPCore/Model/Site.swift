@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// File protocols offered in the Login dialog, in WinSCP's order.

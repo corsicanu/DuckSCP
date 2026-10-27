@@ -178,3 +178,11 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 - `DuckSCP --snapshot <dir> [--import file.ini] [--appearance dark|light]` renders every window to PNG and quits. It uses throwaway storage. Use it to check the UI without screen access.
 - `DuckSCP --demo-commander` opens a Commander tab whose "remote" side is the local disk.
 - `DuckSCP --data-dir <dir>` runs against a separate site store with in-memory passwords.
+
+## License
+
+DuckSCP is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License, version 3 or (at your option) any later version**. See [LICENSE](LICENSE).
+
+It is distributed WITHOUT ANY WARRANTY, without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Bundled third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

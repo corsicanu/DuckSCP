@@ -1,4 +1,5 @@
 #!/bin/zsh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Starts throwaway WebDAV (WsgiDAV, 127.0.0.1:2180, tester/secret) and S3 (moto, 127.0.0.1:2190)
 # servers for integration tests. Uses the venv created by scripts/test_ftpd.sh (needs network once).
 # Usage: scripts/test_httpd.sh start|stop

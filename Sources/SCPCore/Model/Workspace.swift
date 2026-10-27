@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 import Foundation
 
 /// A saved set of sessions opened together (WinSCP workspace). Each entry is a full
