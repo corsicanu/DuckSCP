@@ -9,3 +9,5 @@ fixtures/winscp.ini
 !fixtures/winscp.sample.ini
 !fixtures/winscp.master.sample.ini
 !Tests/**/Fixtures/*.ini
+
+dist/

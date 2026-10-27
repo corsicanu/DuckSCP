@@ -9,6 +9,14 @@ It imports your existing `WinSCP.ini` sites, including saved passwords, workspac
 > **DuckSCP is not WinSCP.** It is an independent project with no affiliation with WinSCP or its author. WinSCP does not endorse, sponsor or support it, and DuckSCP contains no WinSCP source code.
 > "WinSCP" is a trademark of its owner, Martin Přikryl, the author of WinSCP ([winscp.net](https://winscp.net)). The name appears here only to describe compatibility: DuckSCP can import WinSCP's configuration file and follows its layout. For WinSCP itself, go to winscp.net.
 
+## Install
+
+1. Download `DuckSCP-1.0.0-macOS-arm64.dmg` from [Releases](../../releases).
+2. Open it and drag **DuckSCP** to **Applications**.
+3. First launch only: Control-click DuckSCP → **Open** → **Open**. DuckSCP is signed but not notarized, so macOS asks once. If there's no Open button, use **System Settings → Privacy & Security → Open Anyway**.
+
+Apple Silicon, tested on macOS 27. To uninstall, delete the app. Your sites live in `~/Library/Application Support/DuckSCP`, and their passwords are in the Keychain under `ro.corsicanu.duckscp.sites`.
+
 ## Screenshots
 
 ![DuckSCP Commander window in light mode](screenshots/commander-light.png)
@@ -60,6 +68,12 @@ scripts/build_app.sh --install
 ```
 
 This builds `build/DuckSCP.app`, signs it ad hoc and copies it to `~/Applications`.
+
+```bash
+scripts/package.sh
+```
+
+Builds a release into `dist/`: a drag-to-Applications `.dmg`, a `.zip` and `SHA256SUMS.txt`. Both packages are signature-checked by the script.
 
 ```bash
 scripts/test.sh

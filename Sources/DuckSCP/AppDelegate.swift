@@ -231,7 +231,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     attach(session)
                     // Test aid: start editing a remote file, as F4 would (editor not launched in snapshot runs).
                     if let name = value(after: "--demo-edit", in: CommandLine.arguments), let tab = commander?.current {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [self] in
                             if let e = tab.remote.entries.first(where: { $0.name == name }) {
                                 commander?.transfers.editRemote(e, in: tab.remote, useEditor: true)
                             }
