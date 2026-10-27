@@ -34,6 +34,8 @@ public final class TransferEngine {
         public var speedLimit: UInt64 = 0
         /// Files and folders matching this mask are skipped.
         public var exclude = FileMask("")
+        /// Overwrite existing targets without asking (editor saves).
+        public var alwaysOverwrite = false
         public init() {}
     }
 
@@ -230,6 +232,7 @@ public final class TransferEngine {
 
     /// Applies "to all" answers and "newer only"; returns .overwrite or .skip.
     private func resolve(_ c: Conflict) -> Decision {
+        if options.alwaysOverwrite { return .overwrite }
         var d = sticky ?? ask(c)
         switch d {
         case .overwriteAll: sticky = .overwriteAll; d = .overwrite

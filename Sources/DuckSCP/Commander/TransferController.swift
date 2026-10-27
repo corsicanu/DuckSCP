@@ -53,7 +53,11 @@ final class TransferController {
         queueView.show(tab.queue)
     }
 
-    func toggleQueueVisible() { setQueueVisible(!queueVisible) }
+    /// Toolbar "Queue": shows/hides the list and remembers the choice.
+    func toggleQueueVisible() {
+        setQueueVisible(!queueVisible)
+        try? (NSApp.delegate as? AppDelegate)?.prefs.update { $0.showQueue = queueVisible }
+    }
 
     func setQueueVisible(_ visible: Bool) {
         queueVisible = visible
@@ -213,15 +217,17 @@ final class TransferController {
                 }
             } completion: { [weak self] in
                 guard let self, FileManager.default.fileExists(atPath: local.path) else { return }
-                let editor = RemoteEditSession(local: local, remotePath: remotePath, session: session) { [weak self] error in
+                guard let tab = self.commander.tabs.first(where: { $0.remote === panel }) else { return }
+                let editor = RemoteEditSession(local: local, remotePath: remotePath, queue: tab.queue) { [weak self] error in
                     if let error {
                         showError(FileSystemError(.other, "Uploading \(entry.name) failed: \(error). Save again to retry."), in: self?.commander.window)
                     } else {
                         self?.commander.flashStatus("Uploaded \(entry.name)")
-                        panel.refresh()
                     }
                 }
                 self.editors.append(editor)
+                // Snapshot/test runs never launch the user's editor.
+                if (NSApp.delegate as? AppDelegate)?.isSnapshotMode == true { return }
                 if useEditor { EditorLauncher.edit(local, prefs: currentPrefs) } else { NSWorkspace.shared.open(local) }
             }
         } catch {
@@ -240,7 +246,6 @@ final class TransferController {
 final class RemoteEditSession {
     let local: URL
     let remotePath: String
-    let session: RemoteSession
 
     static var editRoot: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -260,14 +265,28 @@ final class RemoteEditSession {
 
     private let editor: RemoteFileEditor
 
-    init(local: URL, remotePath: String, session: RemoteSession, onUpload: @escaping (Error?) -> Void) {
+    /// Each save becomes a queue item, so it shows in Transfers like any upload (WinSCP does
+    /// the same) and runs on the queue's own connection.
+    init(local: URL, remotePath: String, queue: TransferQueue, onUpload: @escaping (Error?) -> Void) {
         self.local = local
         self.remotePath = remotePath
-        self.session = session
+        let name = RemotePath.name(remotePath)
         editor = RemoteFileEditor(local: local, remotePath: remotePath, upload: { local, remote, done in
-            session.perform({ fs in try fs.upload(local, to: remote, offset: 0) { _ in true } }) { r in
-                if case .failure(let e) = r { done(e) } else { done(nil) }
+            var options = currentPrefs.transferOptions
+            options.alwaysOverwrite = true      // saving is the user's decision to replace it
+            options.preservePermissions = false // keep the server's permissions
+            options.exclude = FileMask("")
+            let item = TransferQueue.Item(upload: [local], to: RemotePath.parent(remote), options: options)
+            item.displaySource = "\(name) (edited)"
+            item.displayTarget = RemotePath.parent(remote)
+            item.onFinished = { state in
+                switch state {
+                case .done: done(nil)
+                case .failed(let msg): done(FileSystemError(.other, msg))
+                default: done(FileSystemError.cancelled)
+                }
             }
+            DispatchQueue.main.async { queue.add(item) }
         }, onUploaded: onUpload)
     }
 

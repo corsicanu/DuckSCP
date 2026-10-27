@@ -139,7 +139,7 @@ Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional
 | Key | Command |
 |---|---|
 | F2 | Rename |
-| F4 | Edit in Sublime Text, falling back to TextEdit. Remote files upload on every save, whether the editor saves in place (Sublime's default) or by replacing the file; the status bar shows "Uploaded …". |
+| F4 | Edit in Sublime Text, falling back to TextEdit. Remote files upload on every save, whether the editor saves in place (Sublime's default) or by replacing the file; the status bar shows "Uploaded …" and each save appears in the transfer queue as "name (edited)". |
 | F5 / F6 | Copy / Move to the other panel |
 | F7 | New folder |
 | F8 | Delete (local items go to the Trash unless turned off in Preferences) |
@@ -166,7 +166,9 @@ On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag f
 
 **Lost connections** reconnect automatically: up to 3 attempts, 5 s apart, configurable under Preferences → Endurance. The interrupted operation then runs again. Queued transfers resume from their `.filepart`. The status bar shows reconnect progress.
 
-**Background transfers:** tick *Transfer in background* in the Copy/Move dialog. The item goes to the queue under the panels (toolbar **Queue** shows or hides it). Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
+**Transfer queue** is shown under the panels by default, like WinSCP. Toolbar **Queue** hides or shows it, and the choice is remembered (also under Preferences → Transfer). It lists background transfers and every editor save.
+
+**Background transfers:** tick *Transfer in background* in the Copy/Move dialog to send an item to the queue. Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
 
 Transfers over 100 KB go through a `.filepart` temp file and are renamed when complete. An interrupted download resumes from the `.filepart` on the next attempt.
 

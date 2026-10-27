@@ -50,11 +50,13 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         window.delegate = self
         transfers = TransferController(commander: self)
         buildUI()
+        transfers.setQueueVisible(currentPrefs.showQueue) // WinSCP shows the queue by default
         updateTitle()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateStatusBar() }
         NotificationCenter.default.addObserver(forName: PreferencesStore.didChange, object: nil, queue: .main) { [weak self] _ in
             self?.tabs.forEach { $0.local.preferencesChanged(); $0.remote.preferencesChanged() }
             self?.applyInterface()
+            self?.transfers.setQueueVisible(currentPrefs.showQueue)
         }
     }
 

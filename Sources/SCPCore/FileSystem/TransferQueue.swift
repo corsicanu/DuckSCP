@@ -58,6 +58,8 @@ public final class TransferQueue {
         /// Overrides what the queue shows as source / destination (e.g. "~/Projects/web/app.js").
         public var displaySource: String?
         public var displayTarget: String?
+        /// Called once, on the worker thread, when the item finishes (done, failed or cancelled).
+        public var onFinished: ((State) -> Void)?
 
         public var sourceDescription: String {
             if let displaySource { return displaySource }
@@ -98,11 +100,14 @@ public final class TransferQueue {
     }
 
     public func cancel(_ item: Item) {
-        lock.withLock {
+        let cancelledWhileWaiting: Bool = lock.withLock {
             item.cancelRequested = true
-            if item.state == .pending { item.state = .cancelled }
+            guard item.state == .pending else { return false }
+            item.state = .cancelled
+            return true
         }
         notify(item)
+        if cancelledWhileWaiting { item.onFinished?(.cancelled) }
     }
 
     public func removeFinished() {
@@ -190,6 +195,7 @@ public final class TransferQueue {
             if state.isFinished { item.finishedAt = Date() }
         }
         notify(item)
+        if state.isFinished { item.onFinished?(state) }
     }
 }
 

@@ -229,6 +229,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 case .success(let session):
                     passwordsForWorkspace[site.id] = dialog.cached.password // main thread only
                     attach(session)
+                    // Test aid: start editing a remote file, as F4 would (editor not launched in snapshot runs).
+                    if let name = value(after: "--demo-edit", in: CommandLine.arguments), let tab = commander?.current {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            if let e = tab.remote.entries.first(where: { $0.name == name }) {
+                                commander?.transfers.editRemote(e, in: tab.remote, useEditor: true)
+                            }
+                        }
+                    }
                 case .failure(let error):
                     if (error as? FileSystemError)?.code == .cancelled { return }
                     let a = NSAlert()

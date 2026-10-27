@@ -42,6 +42,8 @@ public struct Preferences: Codable, Equatable {
     public var resumeEnabled = true
     public var resumeThresholdKB = 100
     public var transferInBackgroundByDefault = false
+    /// The queue list under the panels (shown by default, like WinSCP).
+    public var showQueue = true
     /// 0 = unlimited.
     public var speedLimitKBps = 0
     /// WinSCP-style exclude mask, e.g. "*.tmp; .git/; Thumbs.db".
@@ -77,7 +79,7 @@ public struct Preferences: Codable, Equatable {
         get(.editorBundleIDs, &editorBundleIDs); get(.customEditorPath, &customEditorPath)
         get(.preserveTimestamp, &preserveTimestamp); get(.preservePermissions, &preservePermissions)
         get(.resumeEnabled, &resumeEnabled); get(.resumeThresholdKB, &resumeThresholdKB)
-        get(.transferInBackgroundByDefault, &transferInBackgroundByDefault); get(.speedLimitKBps, &speedLimitKBps)
+        get(.transferInBackgroundByDefault, &transferInBackgroundByDefault); get(.showQueue, &showQueue); get(.speedLimitKBps, &speedLimitKBps)
         get(.excludeMask, &excludeMask)
         get(.autoReconnect, &autoReconnect); get(.reconnectAttempts, &reconnectAttempts); get(.reconnectDelaySeconds, &reconnectDelaySeconds)
         get(.connectTimeoutSeconds, &connectTimeoutSeconds); get(.keepaliveSeconds, &keepaliveSeconds); get(.ipVersion, &ipVersion)

@@ -4,7 +4,7 @@ import Testing
 @testable import SCPCore
 
 /// Saves the way Sublime Text does by default (atomic_save: false): rewrite in place.
-private func saveInPlace(_ url: URL, _ text: String) throws {
+func saveInPlace(_ url: URL, _ text: String) throws {
     let h = try FileHandle(forWritingTo: url)
     try h.truncate(atOffset: 0)
     try h.write(contentsOf: Data(text.utf8))
@@ -16,7 +16,7 @@ private func saveAtomically(_ url: URL, _ text: String) throws {
     try Data(text.utf8).write(to: url, options: .atomic)
 }
 
-private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) async {
+func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) async {
     let end = Date().addingTimeInterval(timeout)
     while !condition() && Date() < end { try? await Task.sleep(nanoseconds: 50_000_000) }
 }
@@ -137,5 +137,65 @@ struct RemoteEditIntegrationTests {
         try saveAtomically(copy, "listen 8443 ssl;\n")
         await waitUntil { results.all.count == 2 }
         #expect(try String(contentsOf: remoteFile, encoding: .utf8) == "listen 8443 ssl;\n")
+    }
+}
+
+/// Editor saves go through the transfer queue (so they are listed in Transfers),
+/// overwrite without asking, and report back through onFinished.
+@Suite(.enabled(if: FileManager.default.fileExists(atPath: NSTemporaryDirectory() + "duckscp-test-sshd/sshd.pid"),
+                "start scripts/test_sshd.sh"), .serialized)
+struct RemoteEditQueueTests {
+    @Test func savesAreQueuedAndReachServer() async throws {
+        let sshDir = URL(fileURLWithPath: NSTemporaryDirectory() + "duckscp-test-sshd")
+        let remoteDir = sshDir.appendingPathComponent("home/editq-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: remoteDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: remoteDir) }
+        let remoteFile = remoteDir.appendingPathComponent("app.conf")
+        try Data("old\n".utf8).write(to: remoteFile)
+
+        let site = Site(path: "dummy", fileProtocol: .sftp, allowScpFallback: false, hostName: "127.0.0.1", port: 2222,
+                        userName: NSUserName(), privateKeyPath: sshDir.appendingPathComponent("id_ed25519").path)
+        let keys = HostKeyStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent("hk-\(UUID()).json"), knownHostsFiles: [])
+        let queue = TransferQueue { try Connector.connect(site: site, password: nil, prompter: TestPrompter(), hostKeys: keys) }
+        var asked = 0
+        queue.ask = { _ in asked += 1; return .skip } // must never be consulted for editor saves
+        defer { queue.close() }
+
+        let copyDir = FileManager.default.temporaryDirectory.appendingPathComponent("qcopy-\(UUID())")
+        try FileManager.default.createDirectory(at: copyDir, withIntermediateDirectories: true)
+        let copy = copyDir.appendingPathComponent("app.conf")
+        try Data("old\n".utf8).write(to: copy)
+
+        let results = Uploads()
+        let editor = RemoteFileEditor(local: copy, remotePath: remoteFile.path, queue: DispatchQueue(label: "q"), debounce: 0.2,
+            upload: { local, remote, done in
+                var o = TransferEngine.Options()
+                o.alwaysOverwrite = true
+                let item = TransferQueue.Item(upload: [local], to: RemotePath.parent(remote), options: o)
+                item.displaySource = "app.conf (edited)"
+                item.onFinished = { state in done(state == .done ? nil : FileSystemError(.other, "\(state)")) }
+                queue.add(item)
+            }, onUploaded: { error in results.add(error.map { "\($0)" } ?? "ok") })
+        defer { editor.stop() }
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        try saveInPlace(copy, "new from sublime\n")
+        await waitUntil(10) { results.all.count == 1 }
+        #expect(results.all == ["ok"])
+        #expect(asked == 0)
+        #expect(try String(contentsOf: remoteFile, encoding: .utf8) == "new from sublime\n")
+        #expect(queue.items.map(\.sourceDescription) == ["app.conf (edited)"])
+        #expect(queue.items.first?.state == .done)
+    }
+}
+
+@Suite struct QueueCallbackTests {
+    @Test func onFinishedFiresForCancelledWaitingItem() {
+        let queue = TransferQueue { LocalFileSystem() }
+        let item = TransferQueue.Item(upload: [URL(fileURLWithPath: "/nonexistent")], to: "/tmp")
+        var finished: TransferQueue.State?
+        item.onFinished = { finished = $0 }
+        queue.cancel(item)
+        #expect(finished == .cancelled)
     }
 }

@@ -90,6 +90,7 @@ final class PreferencesWindowController: NSWindowController {
                 number("Speed limit (KB/s, 0 = unlimited):", \.speedLimitKBps),
                 text("Exclude mask:", \.excludeMask, placeholder: "*.tmp; .git/; Thumbs.db"),
                 check("Transfer in background by default", \.transferInBackgroundByDefault),
+                check("Show the transfer queue", \.showQueue),
             ]),
             ("Endurance", [
                 check("Automatically reconnect after a connection is lost", \.autoReconnect),
