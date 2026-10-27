@@ -94,18 +94,22 @@ public struct Preferences: Codable, Equatable {
 public final class PreferencesStore {
     public static let didChange = Notification.Name("PreferencesDidChange")
     public let fileURL: URL
-    public private(set) var current: Preferences
+    private let lock = NSLock()
+    private var value: Preferences
+
+    /// Safe to read from any thread (sessions read endurance/network settings off the main thread).
+    public var current: Preferences { lock.withLock { value } }
 
     public init(fileURL: URL) {
         self.fileURL = fileURL
-        current = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
+        value = (try? Data(contentsOf: fileURL)).flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
     }
 
     public func update(_ change: (inout Preferences) -> Void) throws {
         var p = current
         change(&p)
         guard p != current else { return }
-        current = p
+        lock.withLock { value = p }
         let dir = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let enc = JSONEncoder()

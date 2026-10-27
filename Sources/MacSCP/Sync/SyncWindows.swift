@@ -57,7 +57,7 @@ final class SynchronizeController: NSObject, NSTableViewDataSource, NSTableViewD
             o.criteria = [.time, .size, .timeAndSize][max(0, criteria.indexOfSelectedItem)]
             o.deleteObsolete = delete.state == .on && o.direction != .both
             o.exclude = FileMask(currentPrefs.excludeMask)
-            if tab.session.fs.protocolName.hasPrefix("FTP") { o.timeTolerance = 60 } // FTP lists minutes only
+            if tab.session.protocolName.hasPrefix("FTP") { o.timeTolerance = 60 } // FTP lists minutes only
             compare(options: o, local: URL(fileURLWithPath: localField.stringValue), remote: remoteField.stringValue,
                     preview: preview.state == .on)
         }

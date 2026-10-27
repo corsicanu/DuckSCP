@@ -95,10 +95,10 @@ The app follows macOS light/dark mode by default and switches live. Preferences 
 | Key | Command |
 |---|---|
 | F2 | Rename |
-| F4 | Edit (remote files: download, open in default editor, upload on every save) |
+| F4 | Edit in Sublime Text, falling back to TextEdit (remote files: download, edit, upload on every save) |
 | F5 / F6 | Copy / Move to the other panel |
 | F7 | Create directory |
-| F8 | Delete (local items go to the Trash) |
+| F8 | Delete (local items go to the Trash unless turned off in Preferences) |
 | F9 | Properties and permissions |
 | Tab | Switch panel |
 | Return / Backspace | Open / parent directory |
@@ -140,7 +140,7 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 
 ## Large directories
 
-There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, FTP and locally; `LargeDirectoryTests` checks this on every protocol. Rows are drawn lazily, so the table stays responsive.
+There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, FTP and locally (`LargeDirectoryTests`), and S3 listings page past 1,000 objects (`S3Tests`). Rows are drawn lazily, so the table stays responsive.
 
 ## Security
 
@@ -161,6 +161,10 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 - **Master password** decryption follows WinSCP's AES format (WinZip-AES / fcrypt). It is verified against an independent Python implementation, not yet against a file from WinSCP itself. Every password is MAC-checked, so it either decrypts correctly or is reported as failed.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).
+- **PuTTY keys.** Encrypted `.ppk` v3 (Argon2) needs converting with PuTTYgen.
+- **S3.** No multipart upload, so single files are limited to 5 GB. Folders cannot be renamed.
+- **WebDAV.** Uploads cannot resume; downloads can.
+- **Not ported from WinSCP:** scripting and the .NET assembly, Telnet/local-command proxies, SSH tunnels, a custom SFTP server command (`sudo sftp-server`).
 
 ## Developer notes
 

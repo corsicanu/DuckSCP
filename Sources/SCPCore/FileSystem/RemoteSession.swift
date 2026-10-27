@@ -30,8 +30,14 @@ public struct ReconnectPolicy {
 /// connection errors (Preferences → Endurance).
 public final class RemoteSession {
     public let site: Site
-    /// Replaced after a reconnect; only touched on the session queue (or before first use).
-    public private(set) var fs: RemoteFileSystem
+    /// Replaced after a reconnect. Use only inside `perform`/`sync` (on the session queue).
+    public private(set) var fs: RemoteFileSystem {
+        didSet { lock.withLock { cachedProtocolName = fs.protocolName } }
+    }
+    private let lock = NSLock()
+    private var cachedProtocolName = ""
+    /// Thread-safe, for the status bar.
+    public var protocolName: String { lock.withLock { cachedProtocolName } }
     public private(set) var homeDirectory = "/"
     private let queue: DispatchQueue
     public let connectedAt = Date()
@@ -46,6 +52,7 @@ public final class RemoteSession {
         self.site = site
         self.fs = fs
         self.makeConnection = makeConnection
+        cachedProtocolName = fs.protocolName
         queue = DispatchQueue(label: "session.\(site.hostName)", qos: .userInitiated)
         homeDirectory = (try? fs.homeDirectory()) ?? "/"
         let timer = DispatchSource.makeTimerSource(queue: queue)

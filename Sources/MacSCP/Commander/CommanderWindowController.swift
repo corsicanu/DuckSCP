@@ -230,7 +230,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
             b.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: nil)
             b.imagePosition = .imageLeading
             if let c = tab.session.site.color { b.contentTintColor = NSColor(winscpColor: c) }
-            b.toolTip = "\(tab.session.site.displayTarget) (\(tab.session.fs.protocolName))"
+            b.toolTip = "\(tab.session.site.displayTarget) (\(tab.session.protocolName))"
             tabBar.addArrangedSubview(b)
         }
         let plus = NSButton(title: "New Tab", target: self, action: #selector(newSession))
@@ -559,7 +559,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     func updateStatusBar() {
         guard let tab = current else { return }
         statusBytes.stringValue = Date() < statusMessageUntil ? statusMessage : transfers.statusText
-        statusProtocol.stringValue = "🔒 \(tab.session.fs.protocolName)"
+        statusProtocol.stringValue = "🔒 \(tab.session.protocolName)"
         statusTime.stringValue = Format.duration(Date().timeIntervalSince(tab.session.connectedAt))
     }
 
