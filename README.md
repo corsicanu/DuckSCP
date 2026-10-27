@@ -9,6 +9,18 @@ It imports your existing `WinSCP.ini` sites, including saved passwords, workspac
 > **DuckSCP is not WinSCP.** It is an independent project with no affiliation with WinSCP or its author. WinSCP does not endorse, sponsor or support it, and DuckSCP contains no WinSCP source code.
 > "WinSCP" is a trademark of its owner, Martin Přikryl, the author of WinSCP ([winscp.net](https://winscp.net)). The name appears here only to describe compatibility: DuckSCP can import WinSCP's configuration file and follows its layout. For WinSCP itself, go to winscp.net.
 
+## Screenshots
+
+![DuckSCP Commander window in light mode](screenshots/commander-light.png)
+
+| Dark mode | Custom accent color |
+|---|---|
+| ![Commander window in dark mode](screenshots/commander-dark.png) | ![Commander window with a custom orange accent](screenshots/commander-custom-accent.png) |
+| **Login and imported sites** | **Accent color in Preferences** |
+| ![Login window with sites imported from WinSCP.ini](screenshots/login.png) | ![Preferences: accent color follows macOS or a custom color](screenshots/preferences-accent.png) |
+
+All screenshots use example data.
+
 ## Why DuckSCP exists
 
 DuckSCP is **AI-built**: it was designed and written with an AI coding assistant (Claude), directed and reviewed by me.
