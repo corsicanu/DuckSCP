@@ -214,8 +214,12 @@ final class TransferController {
             } completion: { [weak self] in
                 guard let self, FileManager.default.fileExists(atPath: local.path) else { return }
                 let editor = RemoteEditSession(local: local, remotePath: remotePath, session: session) { [weak self] error in
-                    if let error { showError(error, in: self?.commander.window) }
-                    panel.refresh()
+                    if let error {
+                        showError(FileSystemError(.other, "Uploading \(entry.name) failed: \(error). Save again to retry."), in: self?.commander.window)
+                    } else {
+                        self?.commander.flashStatus("Uploaded \(entry.name)")
+                        panel.refresh()
+                    }
                 }
                 self.editors.append(editor)
                 if useEditor { EditorLauncher.edit(local, prefs: currentPrefs) } else { NSWorkspace.shared.open(local) }
@@ -231,14 +235,12 @@ final class TransferController {
     }
 }
 
-/// Watches a downloaded copy and uploads it back when it changes.
+/// A remote file open in an editor: its private local copy and the watcher that
+/// uploads every save (see RemoteFileEditor).
 final class RemoteEditSession {
     let local: URL
     let remotePath: String
     let session: RemoteSession
-    private var source: DispatchSourceFileSystemObject?
-    private var lastModified: Date?
-    private let onUpload: (Error?) -> Void
 
     static var editRoot: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -256,44 +258,20 @@ final class RemoteEditSession {
         try? FileManager.default.removeItem(at: editRoot)
     }
 
+    private let editor: RemoteFileEditor
+
     init(local: URL, remotePath: String, session: RemoteSession, onUpload: @escaping (Error?) -> Void) {
         self.local = local
         self.remotePath = remotePath
         self.session = session
-        self.onUpload = onUpload
-        lastModified = modificationDate()
-        watch()
+        editor = RemoteFileEditor(local: local, remotePath: remotePath, upload: { local, remote, done in
+            session.perform({ fs in try fs.upload(local, to: remote, offset: 0) { _ in true } }) { r in
+                if case .failure(let e) = r { done(e) } else { done(nil) }
+            }
+        }, onUploaded: onUpload)
     }
 
-    private func modificationDate() -> Date? {
-        (try? FileManager.default.attributesOfItem(atPath: local.path))?[.modificationDate] as? Date
-    }
-
-    /// Editors often save by replacing the file, so watch the folder, not the file.
-    private func watch() {
-        let fd = open(local.deletingLastPathComponent().path, O_EVTONLY)
-        guard fd >= 0 else { return }
-        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
-        src.setEventHandler { [weak self] in self?.changed() }
-        src.setCancelHandler { close(fd) }
-        src.resume()
-        source = src
-    }
-
-    private func changed() {
-        guard let m = modificationDate(), m != lastModified else { return }
-        lastModified = m
-        let local = self.local, remote = remotePath
-        session.perform({ fs in try fs.upload(local, to: remote, offset: 0) { _ in true } }) { [weak self] r in
-            if case .failure(let e) = r { self?.onUpload(e) } else { self?.onUpload(nil) }
-        }
-    }
-
-    func stop() {
-        source?.cancel()
-        source = nil
-        try? FileManager.default.removeItem(at: local.deletingLastPathComponent())
-    }
+    func stop() { editor.stop() }
 }
 
 /// WinSCP's "Confirm overwrite" question.

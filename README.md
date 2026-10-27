@@ -139,7 +139,7 @@ Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional
 | Key | Command |
 |---|---|
 | F2 | Rename |
-| F4 | Edit in Sublime Text, falling back to TextEdit (remote files: download, edit, upload on every save) |
+| F4 | Edit in Sublime Text, falling back to TextEdit. Remote files upload on every save, whether the editor saves in place (Sublime's default) or by replacing the file; the status bar shows "Uploaded …". |
 | F5 / F6 | Copy / Move to the other panel |
 | F7 | New folder |
 | F8 | Delete (local items go to the Trash unless turned off in Preferences) |
