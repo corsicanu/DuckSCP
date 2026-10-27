@@ -35,6 +35,8 @@ enum MainMenu {
         let commands = NSMenu(title: "Commands")
         commands.add("Synchronize…", #selector(CommanderWindowController.synchronize), "s", modifiers: [.command, .option])
         commands.add("Keep Remote Directory up to Date…", #selector(CommanderWindowController.keepUpToDate), "u", modifiers: [.command, .option])
+        commands.add("Find Files…", #selector(CommanderWindowController.findFiles), "f", modifiers: [.command, .shift])
+        commands.add("Synchronized Browsing", #selector(CommanderWindowController.toggleSynchronizedBrowsing), "b", modifiers: [.command, .shift])
         main.addItem(submenu: commands, title: "Commands")
 
         let view = NSMenu(title: "View")

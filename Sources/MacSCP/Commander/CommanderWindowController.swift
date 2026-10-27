@@ -51,6 +51,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateStatusBar() }
         NotificationCenter.default.addObserver(forName: PreferencesStore.didChange, object: nil, queue: .main) { [weak self] _ in
             self?.tabs.forEach { $0.local.preferencesChanged(); $0.remote.preferencesChanged() }
+            self?.applyInterface()
         }
     }
 
@@ -142,11 +143,13 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         static let sites = NSToolbarItem.Identifier("sites")
         static let synchronize = NSToolbarItem.Identifier("synchronize")
         static let keepUpToDate = NSToolbarItem.Identifier("keepUpToDate")
+        static let find = NSToolbarItem.Identifier("find")
+        static let syncBrowse = NSToolbarItem.Identifier("syncBrowse")
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [ToolbarID.newSession, ToolbarID.sites, ToolbarID.disconnect, .space, ToolbarID.synchronize, ToolbarID.keepUpToDate,
-         .flexibleSpace, ToolbarID.refresh, ToolbarID.queue]
+         ToolbarID.syncBrowse, ToolbarID.find, .flexibleSpace, ToolbarID.refresh, ToolbarID.queue]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -164,6 +167,8 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         case ToolbarID.queue: configure(item, "Queue", "list.number", #selector(toggleQueue))
         case ToolbarID.synchronize: configure(item, "Synchronize", "arrow.triangle.2.circlepath", #selector(synchronize))
         case ToolbarID.keepUpToDate: configure(item, "Keep Up to Date", "eye", #selector(keepUpToDate))
+        case ToolbarID.find: configure(item, "Find Files", "magnifyingglass", #selector(findFiles))
+        case ToolbarID.syncBrowse: configure(item, "Sync Browsing", "link", #selector(toggleSynchronizedBrowsing))
         default: return nil
         }
         return item
@@ -183,6 +188,9 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         tab.local.delegate = self
         tab.remote.delegate = self
         tab.local.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
+        tab.remote.promiseWriter = { [weak self] entry, dir, localDir, done in
+            self?.transfers.downloadForPromise(entry, from: dir, to: localDir, session: session, completion: done)
+        }
         tab.remote.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
         transfers.attach(tab)
         let policy = { ReconnectPolicy(currentPrefs) }
@@ -201,6 +209,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         window?.contentView?.layoutSubtreeIfNeeded()
         split.adjustSubviews()
         split.setPosition(split.bounds.width / 2, ofDividerAt: 0)
+        applyInterface()
         rebuildTabBar()
         transfers.showQueue(of: tab)
         tab.lastActive.focus()
@@ -305,7 +314,51 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         current?.remote.setActive(panel === current?.remote)
     }
 
-    func panelPathDidChange(_ panel: FilePanel) { updateTitle() }
+    func panelPathDidChange(_ panel: FilePanel) {
+        updateTitle()
+        syncBrowse(from: panel)
+    }
+
+    /// Synchronized browsing: mirror "enter folder" and "go up" in the other panel.
+    private func syncBrowse(from panel: FilePanel) {
+        if panel.navigatedBySync {
+            panel.navigatedBySync = false // this move was the mirror of the other panel's
+            return
+        }
+        guard currentPrefs.synchronizedBrowsing, let other = otherPanel(panel),
+              let old = panel.previousPath, old != panel.path else { return }
+        if RemotePath.parent(panel.path) == old {
+            other.navigatedBySync = true
+            other.load(RemotePath.join(other.path, RemotePath.name(panel.path)), recordHistory: true)
+        } else if RemotePath.parent(old) == panel.path {
+            other.navigatedBySync = true
+            other.load(RemotePath.parent(other.path), recordHistory: true, select: RemotePath.name(other.path))
+        }
+    }
+
+    @objc func toggleSynchronizedBrowsing() {
+        try? (NSApp.delegate as? AppDelegate)?.prefs.update { $0.synchronizedBrowsing.toggle() }
+        flashStatus("Synchronized browsing \(currentPrefs.synchronizedBrowsing ? "on" : "off")")
+    }
+
+    private var findWindows: [FindFilesWindow] = []
+
+    @objc func findFiles() {
+        guard let tab = current else { return NSSound.beep() }
+        let w = FindFilesWindow(tab: tab)
+        findWindows.append(w)
+        w.showWindow(nil)
+    }
+
+    /// Explorer interface: remote panel only (WinSCP's Explorer); Finder is the local side.
+    func applyInterface() {
+        guard let tab = current else { return }
+        let explorer = currentPrefs.interface == .explorer
+        tab.local.view.isHidden = explorer
+        split.adjustSubviews()
+        if !explorer { split.setPosition(split.bounds.width / 2, ofDividerAt: 0) }
+        if explorer { panelDidBecomeActive(tab.remote); tab.remote.focus() }
+    }
 
     func panel(_ panel: FilePanel, didFail error: Error) { showError(error, in: window) }
 

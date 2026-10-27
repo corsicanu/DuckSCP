@@ -107,6 +107,12 @@ On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag f
 
 **Keep Remote Directory up to Date** (⌥⌘U) watches a local folder with FSEvents and uploads changes about 1 s after they settle. It can also delete remote files that were removed locally.
 
+**Find Files** (⇧⌘F) searches the remote tree by mask (`*.log; report*`) on its own connection, so the panels stay usable. Double-click a result to show it in the remote panel.
+
+**Synchronized browsing** (⇧⌘B or toolbar) mirrors "open folder" and "go up" from one panel in the other.
+
+**Explorer interface** (Preferences → Environment): remote panel only, with Finder as the local side. Drag remote files or folders straight into Finder; they download where you drop them.
+
 **Lost connections** reconnect automatically: up to 3 attempts, 5 s apart, configurable under Preferences → Endurance. The interrupted operation then runs again. Queued transfers resume from their `.filepart`. The status bar shows reconnect progress.
 
 **Background transfers:** tick *Transfer in background* in the Copy/Move dialog. The item goes to the queue under the panels (toolbar **Queue** shows or hides it). Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
@@ -143,7 +149,7 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 
 ## Known limitations
 
-- **Not yet built:** WebDAV, S3, workspaces, Find Files, Explorer-style interface.
+- **Not yet built:** WebDAV, S3, workspaces.
 - **Master password.** If the ini uses a WinSCP master password, its passwords cannot be imported.
 - **FTPS.** An accepted untrusted certificate is not pinned; you are asked again on every connect.
 - **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).

@@ -170,6 +170,23 @@ final class TransferController {
         }
     }
 
+    /// Finder drop of a remote item: downloads it on the session queue into `localDir`.
+    func downloadForPromise(_ entry: RemoteEntry, from dir: String, to localDir: URL, session: RemoteSession,
+                            completion: @escaping (Error?) -> Void) {
+        let options = currentPrefs.transferOptions
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try session.sync { fs in
+                    try TransferEngine(fs: fs, options: options, ask: { _ in .overwrite }, report: { _ in true })
+                        .download(from: dir, entries: [entry], to: localDir)
+                }
+                completion(nil)
+            } catch {
+                completion(error)
+            }
+        }
+    }
+
     // MARK: Edit (F4)
 
     private var editors: [RemoteEditSession] = []

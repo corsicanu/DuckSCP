@@ -66,6 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
                 tab.queue.add(TransferQueue.Item(upload: [file], to: out.path))
                 commander?.transfers.setQueueVisible(true)
+                if let name = value(after: "--demo-enter", in: args) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) { tab.local.load(RemotePath.join(tab.local.path, name)) }
+                }
                 // Development aid: start Keep Up to Date from the demo folder into another folder.
                 if let target = value(after: "--demo-keep", in: args), let c = commander {
                     c.keepUpToDate()

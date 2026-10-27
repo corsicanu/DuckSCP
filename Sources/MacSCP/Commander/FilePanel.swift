@@ -54,6 +54,10 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     weak var delegate: FilePanelDelegate?
 
     private(set) var path: String
+    /// Path before the last successful navigation (for synchronized browsing).
+    private(set) var previousPath: String?
+    /// Set when synchronized browsing moves this panel, so the move is not mirrored back.
+    var navigatedBySync = false
     private(set) var entries: [RemoteEntry] = []
     /// Unfiltered listing; `entries` hides dot files unless "Show hidden files" is on.
     private var allEntries: [RemoteEntry] = []
@@ -145,7 +149,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
         table.menu = contextMenu()
         table.registerForDraggedTypes([.fileURL, .panelEntries])
         table.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
-        table.setDraggingSourceOperationMask(backend.isLocal ? .copy : [], forLocal: false)
+        table.setDraggingSourceOperationMask(.copy, forLocal: false) // local: file URLs; remote: file promises
 
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -239,6 +243,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
                     self.history.append(previous)
                     self.future.removeAll()
                 }
+                self.previousPath = self.path
                 self.path = newPath
                 self.allEntries = list
                 self.entries = Self.visible(list)
@@ -247,6 +252,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
                 self.rebuildPathPopup()
                 self.delegate?.panelPathDidChange(self)
             case .failure(let error):
+                self.navigatedBySync = false
                 self.delegate?.panel(self, didFail: error)
                 // The configured start folder may be gone: fall back to home once.
                 if !self.hasLoaded && newPath != self.backend.homeDirectory {
@@ -470,8 +476,18 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
 
     // MARK: Drag and drop
 
+    /// Writes a remote entry into a folder chosen by Finder (drag out of the remote panel).
+    var promiseWriter: ((RemoteEntry, String, URL, @escaping (Error?) -> Void) -> Void)?
+
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         guard let e = entry(at: row) else { return nil }
+        if !backend.isLocal, promiseWriter != nil {
+            let type = e.isDirectoryLike ? UTType.folder : (UTType(filenameExtension: (e.name as NSString).pathExtension) ?? .data)
+            let provider = PanelPromiseProvider(fileType: type.identifier, delegate: self)
+            provider.entry = e
+            provider.path = RemotePath.join(path, e.name)
+            return provider
+        }
         let item = NSPasteboardItem()
         item.setString(RemotePath.join(path, e.name), forType: .panelEntries)
         if backend.isLocal {
@@ -502,6 +518,33 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
         guard !paths.isEmpty else { return false }
         onDrop?(self, paths, source)
         return true
+    }
+}
+
+/// File promise for a remote entry; also carries the panel path so in-app drops still work.
+final class PanelPromiseProvider: NSFilePromiseProvider {
+    var entry: RemoteEntry?
+    var path = ""
+
+    override func writableTypes(for pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {
+        super.writableTypes(for: pasteboard) + [.panelEntries]
+    }
+
+    override func pasteboardPropertyList(forType type: NSPasteboard.PasteboardType) -> Any? {
+        type == .panelEntries ? path : super.pasteboardPropertyList(forType: type)
+    }
+}
+
+extension FilePanel: NSFilePromiseProviderDelegate {
+    func filePromiseProvider(_ provider: NSFilePromiseProvider, fileNameForType fileType: String) -> String {
+        (provider as? PanelPromiseProvider)?.entry?.name ?? "download"
+    }
+
+    func filePromiseProvider(_ provider: NSFilePromiseProvider, writePromiseTo url: URL, completionHandler: @escaping (Error?) -> Void) {
+        guard let p = provider as? PanelPromiseProvider, let e = p.entry, let writer = promiseWriter else {
+            return completionHandler(FileSystemError(.other, "Nothing to download."))
+        }
+        writer(e, RemotePath.parent(p.path), url.deletingLastPathComponent(), completionHandler)
     }
 }
 

@@ -94,3 +94,27 @@ import Testing
         #expect(try Synchronizer(fs: LocalFileSystem(), options: o).plan(localRoot: local, remoteRoot: remote.path).isEmpty)
     }
 }
+
+@Suite struct FileFinderTests {
+    @Test func findsByMaskRecursively() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("find-\(UUID())")
+        for rel in ["a.log", "b.txt", "x/c.LOG", "x/y/d.log", "x/y/e.txt"] {
+            let u = root.appendingPathComponent(rel)
+            try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(rel.utf8).write(to: u)
+        }
+        try FileManager.default.createSymbolicLink(atPath: root.appendingPathComponent("x/loop").path, withDestinationPath: root.path)
+        var c = FileFinder.Criteria()
+        c.mask = FileMask("*.log")
+        var hits: [String] = []
+        FileFinder(fs: LocalFileSystem(), criteria: c).search(root.path) { dir, e in
+            hits.append(String(RemotePath.join(dir, e.name).dropFirst(root.path.count + 1)))
+        }
+        #expect(hits == ["a.log", "x/c.LOG", "x/y/d.log"])
+
+        var count = 0
+        c.mask = FileMask("*")
+        FileFinder(fs: LocalFileSystem(), criteria: c).search(root.path, shouldContinue: { count < 2 }) { _, _ in count += 1 }
+        #expect(count == 2)
+    }
+}
