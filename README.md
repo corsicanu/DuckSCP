@@ -98,7 +98,19 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - New local files are created with `O_NOFOLLOW`, so a planted symlink is never followed.
 - SCP shell arguments are always single-quoted.
 - FTP commands containing CR, LF or NUL are refused, so file names cannot inject extra FTP commands.
+- **Move** never deletes a source that was partly skipped at an overwrite prompt.
+- A downloaded file never replaces a local folder of the same name.
+- Symlinked folders are followed only when you select them directly, so link loops can't run away.
+- F4-edit copies live in a `0700` folder in Caches. They are deleted on quit, and any leftovers are removed at the next launch.
 - The app is signed with the hardened runtime.
+
+## Known limitations
+
+- **Not yet built:** WebDAV, S3, workspaces, Synchronize, Keep Remote Directory Up to Date, Find Files, Explorer-style interface, Preferences dialog.
+- **Master password.** If the ini uses a WinSCP master password, its passwords cannot be imported.
+- **Lost connections.** There is no automatic reconnect. Use Disconnect, then log in again.
+- **FTPS.** An accepted untrusted certificate is not pinned; you are asked again on every connect.
+- **Keyboard.** F-keys need **fn** on Mac keyboards (or use the Files menu).
 
 ## Developer notes
 

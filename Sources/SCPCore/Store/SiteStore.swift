@@ -26,6 +26,8 @@ public final class SiteStore {
         let dir = fileURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true,
                                                 attributes: [.posixPermissions: 0o700])
+        // Also tighten a folder that already existed; the atomic write briefly creates the file with umask permissions.
+        try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try enc.encode(sites).write(to: fileURL, options: [.atomic])

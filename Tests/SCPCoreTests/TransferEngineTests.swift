@@ -141,3 +141,54 @@ import Testing
         guard case .failed = item.state else { Issue.record("expected failure, got \(item.state)"); return }
     }
 }
+
+@Suite struct TransferEngineSafetyTests {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("safe-" + UUID().uuidString)
+    let fs = LocalFileSystem()
+
+    func mk(_ rel: String, _ text: String? = nil) throws -> URL {
+        let u = root.appendingPathComponent(rel)
+        if let text {
+            try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: u)
+        } else {
+            try FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+        }
+        return u
+    }
+
+    @Test func moveKeepsSourceWhenSomethingWasSkipped() throws {
+        let src = try mk("src/dir/a.txt", "new").deletingLastPathComponent()
+        _ = try mk("src/dir/b.txt", "new")
+        _ = try mk("dst/dir/a.txt", "old")
+        let engine = TransferEngine(fs: fs, ask: { _ in .skip }, report: { _ in true })
+        try engine.upload([src], to: root.appendingPathComponent("dst").path, deleteSource: true)
+        #expect(FileManager.default.fileExists(atPath: src.appendingPathComponent("a.txt").path))
+        #expect((try? String(contentsOf: root.appendingPathComponent("dst/dir/b.txt"), encoding: .utf8)) == "new")
+    }
+
+    @Test func fileNeverReplacesLocalFolder() throws {
+        _ = try mk("remote/x", "file")
+        let localFolder = try mk("local/x")
+        _ = try mk("local/x/keep.txt", "keep")
+        let engine = TransferEngine(fs: fs, ask: { _ in .overwrite }, report: { _ in true })
+        #expect(throws: FileSystemError.self) {
+            try engine.download(from: root.appendingPathComponent("remote").path, entries: try fs.list(root.appendingPathComponent("remote").path),
+                                to: root.appendingPathComponent("local"))
+        }
+        #expect(FileManager.default.fileExists(atPath: localFolder.appendingPathComponent("keep.txt").path))
+    }
+
+    @Test func symlinkLoopsAreNotFollowed() throws {
+        let dir = try mk("tree/d")
+        _ = try mk("tree/d/f.txt", "x")
+        try FileManager.default.createSymbolicLink(atPath: dir.appendingPathComponent("loop").path, withDestinationPath: dir.path)
+        let out = try mk("out")
+        let engine = TransferEngine(fs: fs, ask: { _ in .overwrite }, report: { _ in true })
+        try engine.upload([dir], to: out.path)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: out.appendingPathComponent("d").path) == ["f.txt"])
+        let back = try mk("back")
+        try engine.download(from: root.appendingPathComponent("tree").path, entries: try fs.list(root.appendingPathComponent("tree").path), to: back)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: back.appendingPathComponent("d").path) == ["f.txt"])
+    }
+}

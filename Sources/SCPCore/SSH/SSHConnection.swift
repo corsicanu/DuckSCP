@@ -175,13 +175,16 @@ public final class SSHConnection {
                 libssh2_userauth_publickey_frommemory(session, user, user.utf8.count, nil, 0, ptr, strlen(ptr), nil) == 0
             }
         }
-        if libssh2_userauth_publickey_fromfile_ex(session, user, UInt32(user.utf8.count), nil, expanded, nil) == 0 { return true }
-        // Most likely encrypted: ask for the passphrase (3 tries).
-        for _ in 0..<3 {
+        var rc = libssh2_userauth_publickey_fromfile_ex(session, user, UInt32(user.utf8.count), nil, expanded, nil)
+        // LIBSSH2_ERROR_FILE = the key could not be read/decrypted, i.e. it needs a passphrase.
+        // Any other failure means the server refused the key: do not ask.
+        var tries = 0
+        while rc == LIBSSH2_ERROR_FILE && tries < 3 {
             guard let p = prompter.askPassphrase(keyPath: path) else { throw FileSystemError.cancelled }
-            if libssh2_userauth_publickey_fromfile_ex(session, user, UInt32(user.utf8.count), nil, expanded, p) == 0 { return true }
+            rc = libssh2_userauth_publickey_fromfile_ex(session, user, UInt32(user.utf8.count), nil, expanded, p)
+            tries += 1
         }
-        return false
+        return rc == 0
     }
 
     /// ssh-agent (the macOS equivalent of Pageant).

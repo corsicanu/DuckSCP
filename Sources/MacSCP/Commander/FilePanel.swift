@@ -58,6 +58,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     private var history: [String] = []
     private var future: [String] = []
     private var pendingSelection: String?
+    private var hasLoaded = false
 
     private let table = PanelTableView()
     private let pathPopup = NSPopUpButton()
@@ -221,6 +222,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
             guard let self else { return }
             switch result {
             case .success(let list):
+                self.hasLoaded = true
                 if recordHistory && newPath != previous {
                     self.history.append(previous)
                     self.future.removeAll()
@@ -233,6 +235,11 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
                 self.delegate?.panelPathDidChange(self)
             case .failure(let error):
                 self.delegate?.panel(self, didFail: error)
+                // The configured start folder may be gone: fall back to home once.
+                if !self.hasLoaded && newPath != self.backend.homeDirectory {
+                    self.path = self.backend.homeDirectory
+                    self.load(self.path, recordHistory: false)
+                }
             }
         }
     }

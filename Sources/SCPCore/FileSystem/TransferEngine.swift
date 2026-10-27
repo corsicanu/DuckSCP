@@ -74,12 +74,21 @@ public final class TransferEngine {
         progress.total = try entries.reduce(0) { $0 + (try remoteSize(RemotePath.join(remoteDir, $1.name), $1, depth: 0)) }
         for e in entries {
             let src = RemotePath.join(remoteDir, e.name)
+            let skippedBefore = skipped
             try downloadItem(src, e, into: localDir, depth: 0)
-            if deleteSource { try RecursiveOps.delete(src, entry: e, fs: fs) }
+            // Move: never delete a source that was (partly) skipped.
+            if deleteSource && skipped == skippedBefore { try RecursiveOps.delete(src, entry: e, fs: fs) }
         }
     }
 
+    /// Symlinked directories are followed only when the user selected them directly;
+    /// deeper links are skipped so link loops cannot blow up the recursion.
+    private func follows(_ e: RemoteEntry, depth: Int) -> Bool {
+        e.kind == .directory || (e.isDirectoryLike && depth == 0)
+    }
+
     private func remoteSize(_ path: String, _ e: RemoteEntry, depth: Int) throws -> UInt64 {
+        if e.kind == .symlink && e.targetIsDirectory && !follows(e, depth: depth) { return 0 }
         guard e.isDirectoryLike else { return e.size }
         guard depth < Self.maxDepth else { return 0 }
         return try fs.list(path).filter { RemotePath.isSafeName($0.name) }
@@ -91,6 +100,7 @@ public final class TransferEngine {
         guard RemotePath.isSafeName(e.name) else { throw FileSystemError(.other, "Refusing unsafe file name from server: \(e.name)") }
         guard depth < Self.maxDepth else { throw FileSystemError(.other, "Directory tree too deep: \(src)") }
         let dst = localDir.appendingPathComponent(e.name)
+        if e.isDirectoryLike && !follows(e, depth: depth) { return skipFile(0) }
         if e.isDirectoryLike {
             var isDir: ObjCBool = false
             if !FileManager.default.fileExists(atPath: dst.path, isDirectory: &isDir) {
@@ -111,6 +121,9 @@ public final class TransferEngine {
         let part = URL(fileURLWithPath: dst.path + ".filepart")
         let partSize = (try? FileManager.default.attributesOfItem(atPath: part.path)[.size] as? UInt64) ?? 0
         var offset: UInt64 = 0
+        if existing?[.type] as? FileAttributeType == .typeDirectory {
+            throw FileSystemError(.exists, "\(dst.path) is a folder; cannot replace it with a file.")
+        }
         if let existing {
             let decision = resolve(Conflict(name: e.name, sourceSize: e.size, sourceDate: e.modified,
                                             targetSize: (existing[.size] as? UInt64) ?? 0,
@@ -140,16 +153,17 @@ public final class TransferEngine {
     public func upload(_ locals: [URL], to remoteDir: String, deleteSource: Bool = false) throws {
         progress.total = locals.reduce(0) { $0 + localSize($1, depth: 0) }
         for url in locals {
+            let skippedBefore = skipped
             try uploadItem(url, into: remoteDir, depth: 0)
-            if deleteSource { try FileManager.default.removeItem(at: url) }
+            if deleteSource && skipped == skippedBefore { try FileManager.default.removeItem(at: url) }
         }
     }
 
     private func localSize(_ url: URL, depth: Int) -> UInt64 {
-        let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey, .isSymbolicLinkKey])
-        if values?.isSymbolicLink == true && values?.isDirectory != true {
-            return UInt64((try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0)
-        }
+        let isLink = (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
+        let target = isLink && depth == 0 ? url.resolvingSymlinksInPath() : url
+        if isLink && depth > 0 { return 0 } // see uploadItem
+        let values = try? target.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
         guard values?.isDirectory == true else { return UInt64(values?.fileSize ?? 0) }
         guard depth < Self.maxDepth else { return 0 }
         let children = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
@@ -160,6 +174,9 @@ public final class TransferEngine {
         guard depth < Self.maxDepth else { throw FileSystemError(.other, "Directory tree too deep: \(url.path)") }
         let name = url.lastPathComponent
         let dst = RemotePath.join(remoteDir, name)
+        // Local symlinks are followed only when selected directly (loop protection, like downloads).
+        let isLink = (try? FileManager.default.attributesOfItem(atPath: url.path)[.type] as? FileAttributeType) == .typeSymbolicLink
+        if isLink && depth > 0 { return skipFile(0) }
         let attrs = try FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path)
         let modified = attrs[.modificationDate] as? Date
         let mode = (attrs[.posixPermissions] as? NSNumber)?.uint32Value
@@ -247,7 +264,11 @@ public final class TransferEngine {
         _ = report(progress)
     }
 
+    /// Files skipped so far (overwrite answered "No").
+    private var skipped = 0
+
     private func skipFile(_ size: UInt64) {
+        skipped += 1
         progress.totalDone += size
         progress.filesDone += 1
         _ = report(progress)

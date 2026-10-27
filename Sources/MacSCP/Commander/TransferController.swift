@@ -218,11 +218,20 @@ final class RemoteEditSession {
     private var lastModified: Date?
     private let onUpload: (Error?) -> Void
 
+    static var editRoot: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(Branding.bundleID).appendingPathComponent("edit")
+    }
+
     static func makeTempDirectory() throws -> URL {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(Branding.bundleID).appendingPathComponent("edit").appendingPathComponent(UUID().uuidString)
+        let base = editRoot.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         return base
+    }
+
+    /// Removes copies left behind by a crash; downloaded files should not linger on disk.
+    static func removeStaleCopies() {
+        try? FileManager.default.removeItem(at: editRoot)
     }
 
     init(local: URL, remotePath: String, session: RemoteSession, onUpload: @escaping (Error?) -> Void) {

@@ -236,3 +236,21 @@ enum HMACHelper {
         Data(HMAC<Insecure.SHA1>.authenticationCode(for: message, using: SymmetricKey(data: key)))
     }
 }
+
+extension SSHIntegrationTests {
+    @Test func rejectedPlainKeyDoesNotAskPassphrase() throws {
+        // A valid key the server does not know: must fall through without passphrase prompts.
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("k-\(UUID().uuidString)")
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/ssh-keygen")
+        p.arguments = ["-q", "-t", "ed25519", "-N", "", "-f", tmp.path]
+        try p.run(); p.waitUntilExit()
+        let prompter = TestPrompter()
+        var s = site(.sftp, key: "id_ed25519")
+        s.privateKeyPath = tmp.path
+        #expect(throws: FileSystemError.self) {
+            try Connector.connect(site: s, password: nil, prompter: prompter, hostKeys: hostKeys)
+        }
+        #expect(prompter.passphraseAsked == 0)
+    }
+}

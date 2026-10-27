@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
+        RemoteEditSession.removeStaleCopies()
         let snapshotDir = value(after: "--snapshot", in: args)
         let dataDir = value(after: "--data-dir", in: args)
 
