@@ -6,10 +6,12 @@ final class SessionTab {
     let session: RemoteSession
     let local: FilePanel
     let remote: FilePanel
+    let queue: TransferQueue
     var lastActive: FilePanel
 
     init(session: RemoteSession) {
         self.session = session
+        queue = TransferQueue(connect: session.makeConnection)
         local = FilePanel(backend: LocalBackend(), path: session.site.localDirectory.isEmpty ? nil : session.site.localDirectory)
         remote = FilePanel(backend: RemoteBackend(session: session),
                            path: session.site.remoteDirectory.isEmpty ? nil : session.site.remoteDirectory)
@@ -174,6 +176,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         tab.remote.delegate = self
         tab.local.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
         tab.remote.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
+        transfers.attach(tab)
         tabs.append(tab)
         select(tab)
     }
@@ -187,6 +190,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         split.adjustSubviews()
         split.setPosition(split.bounds.width / 2, ofDividerAt: 0)
         rebuildTabBar()
+        transfers.showQueue(of: tab)
         tab.lastActive.focus()
         panelDidBecomeActive(tab.lastActive)
         updateTitle()
@@ -224,6 +228,14 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     @objc func disconnect() {
         guard let tab = current, let i = tabs.firstIndex(where: { $0 === tab }) else { return }
+        if tab.queue.hasActiveItems {
+            let a = NSAlert()
+            a.messageText = "There are transfers in the queue. Disconnect anyway?"
+            a.addButton(withTitle: "OK")
+            a.addButton(withTitle: "Cancel")
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
+        tab.queue.close()
         tab.session.close()
         tabs.remove(at: i)
         if let next = tabs.last {
@@ -434,7 +446,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     func windowWillClose(_ notification: Notification) {
         timer?.invalidate()
-        tabs.forEach { $0.session.close() }
+        tabs.forEach { $0.queue.close(); $0.session.close() }
         tabs.removeAll()
     }
 

@@ -13,7 +13,7 @@ It imports your existing `WinSCP.ini` sites, including saved passwords.
 | 1 | Login / Site Manager, WinSCP.ini import, Keychain passwords | ✅ |
 | 2 | Commander window: session tabs, local/remote panels, F-key commands, transfer engine | ✅ |
 | 3 | SFTP / SCP (libssh2): host-key checks, passwords, OpenSSH + PuTTY keys, ssh-agent | ✅ |
-| 4 | Transfer queue, progress, resume | ⏳ |
+| 4 | Transfer queue on a second connection, progress dialog, overwrite prompts, resume | ✅ |
 | 5 | FTP / FTPS (libcurl) | ⏳ |
 
 ## Build and run
@@ -69,6 +69,8 @@ A fake sample lives in [`fixtures/winscp.sample.ini`](fixtures/winscp.sample.ini
 | Return / Backspace | Open / parent directory |
 
 On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag files between panels or in from Finder.
+
+**Background transfers:** tick *Transfer in background* in the Copy/Move dialog. The item goes to the queue under the panels (toolbar **Queue** shows or hides it). Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
 
 Transfers over 100 KB go through a `.filepart` temp file and are renamed when complete. An interrupted download resumes from the `.filepart` on the next attempt.
 

@@ -8,10 +8,13 @@ public final class RemoteSession {
     public private(set) var homeDirectory = "/"
     private let queue: DispatchQueue
     public let connectedAt = Date()
+    /// Opens another connection to the same site (for the transfer queue).
+    public let makeConnection: () throws -> RemoteFileSystem
 
-    public init(site: Site, fs: RemoteFileSystem) {
+    public init(site: Site, fs: RemoteFileSystem, makeConnection: @escaping () throws -> RemoteFileSystem) {
         self.site = site
         self.fs = fs
+        self.makeConnection = makeConnection
         queue = DispatchQueue(label: "session.\(site.hostName)", qos: .userInitiated)
         homeDirectory = (try? fs.homeDirectory()) ?? "/"
         let timer = DispatchSource.makeTimerSource(queue: queue)

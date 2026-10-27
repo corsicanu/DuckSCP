@@ -12,7 +12,53 @@ final class TransferController {
 
     var statusText: String { bytesTransferred == 0 ? "" : "Transferred: \(Format.shortSize(bytesTransferred))" }
 
-    func toggleQueueVisible() {}
+    private let queueView = QueueView()
+    private var queueVisible = false
+    /// Items whose completion was already handled. Change notifications are delivered
+    /// asynchronously, so several can arrive after an item has finished.
+    private var completed = Set<UUID>()
+    var transferInBackground = false
+
+    /// Hooks a tab's queue to the UI: progress refreshes, overwrite questions, panel reloads.
+    func attach(_ tab: SessionTab) {
+        tab.queue.ask = { [weak self] conflict in
+            DispatchQueue.main.sync { OverwritePrompt.ask(conflict, window: self?.commander.window) }
+        }
+        tab.queue.onChange = { [weak self, weak tab] item in
+            guard let self, let tab else { return }
+            if tab === self.commander.current { self.queueView.reload() }
+            if item.state.isFinished, self.completed.insert(item.id).inserted {
+                self.bytesTransferred += item.progress.totalDone
+                tab.local.refresh()
+                tab.remote.refresh()
+                if case .failed(let msg) = item.state {
+                    showError(FileSystemError(.other, "Transfer of \(item.sourceDescription) failed: \(msg)"), in: self.commander.window)
+                }
+            }
+        }
+    }
+
+    func showQueue(of tab: SessionTab) {
+        if queueView.superview == nil {
+            queueView.translatesAutoresizingMaskIntoConstraints = false
+            commander.queueContainer.addSubview(queueView)
+            NSLayoutConstraint.activate([
+                queueView.topAnchor.constraint(equalTo: commander.queueContainer.topAnchor, constant: 4),
+                queueView.leadingAnchor.constraint(equalTo: commander.queueContainer.leadingAnchor),
+                queueView.trailingAnchor.constraint(equalTo: commander.queueContainer.trailingAnchor),
+                queueView.bottomAnchor.constraint(equalTo: commander.queueContainer.bottomAnchor),
+            ])
+        }
+        queueView.show(tab.queue)
+    }
+
+    func toggleQueueVisible() { setQueueVisible(!queueVisible) }
+
+    func setQueueVisible(_ visible: Bool) {
+        queueVisible = visible
+        commander.queueHeight.constant = visible ? 150 : 0
+        queueView.isHidden = !visible
+    }
 
     // MARK: Copy / Move
 
@@ -31,17 +77,30 @@ final class TransferController {
         let perms = NSButton(checkboxWithTitle: "Set permissions from local files", target: nil, action: nil)
         perms.state = options.preservePermissions ? .on : .off
         perms.isHidden = !upload
-        let stack = NSStackView(views: [target, preserve, perms])
+        let background = NSButton(checkboxWithTitle: "Transfer in background (add to transfer queue)", target: nil, action: nil)
+        background.state = transferInBackground ? .on : .off
+        let stack = NSStackView(views: [target, preserve, perms, background])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.frame = NSRect(x: 0, y: 0, width: 380, height: upload ? 74 : 50)
+        stack.frame = NSRect(x: 0, y: 0, width: 380, height: upload ? 98 : 74)
         alert.accessoryView = stack
         alert.window.initialFirstResponder = target
         alert.beginSheetModal(for: window) { [self] r in
             guard r == .alertFirstButtonReturn else { return }
             options.preserveTimestamp = preserve.state == .on
             options.preservePermissions = perms.state == .on
+            transferInBackground = background.state == .on
             let dir = target.stringValue.trimmingCharacters(in: .whitespaces)
+            if transferInBackground, let tab = commander.current {
+                let targetDir = dir.isEmpty ? dst.path : dir
+                let item = upload
+                    ? TransferQueue.Item(upload: entries.map { URL(fileURLWithPath: RemotePath.join(src.path, $0.name)) },
+                                         to: targetDir, move: move, options: options)
+                    : TransferQueue.Item(download: entries, from: src.path, to: targetDir, move: move, options: options)
+                tab.queue.add(item)
+                setQueueVisible(true)
+                return
+            }
             run(entries: entries, srcDir: src.path, upload: upload, targetDir: dir.isEmpty ? dst.path : dir,
                 move: move, session: sessionOf(src, dst)) {
                 src.refresh()

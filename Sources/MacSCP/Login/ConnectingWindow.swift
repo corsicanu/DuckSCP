@@ -8,6 +8,8 @@ final class ConnectingWindow: NSWindowController, ConnectionPrompter {
     private var cancelled = false
     private let site: Site
     private var savedPassword: String?
+    /// Answers given during this connection, replayed for background connections.
+    let cached = CachedPrompter()
 
     init(site: Site) {
         self.site = site
@@ -68,6 +70,12 @@ final class ConnectingWindow: NSWindowController, ConnectionPrompter {
     }
 
     func verifyHostKey(host: String, port: Int, key: HostKey, verdict: HostKeyVerdict) -> HostKeyDecision {
+        let decision = askHostKey(host: host, port: port, key: key, verdict: verdict)
+        if decision != .reject { cached.acceptedHostKey = key }
+        return decision
+    }
+
+    private func askHostKey(host: String, port: Int, key: HostKey, verdict: HostKeyVerdict) -> HostKeyDecision {
         onMain {
             let a = NSAlert()
             let details = "\(key.type) \(key.sha256Fingerprint)"
@@ -116,12 +124,17 @@ final class ConnectingWindow: NSWindowController, ConnectionPrompter {
 
     func askPassword(_ prompt: String) -> String? {
         let value = secret(title: "Password - \(site.displayTarget)", prompt: prompt)
-        if let value { savedPassword = value }
+        if let value {
+            savedPassword = value
+            cached.password = value
+        }
         return value
     }
 
     func askPassphrase(keyPath: String) -> String? {
-        secret(title: "Key passphrase", prompt: "Passphrase for key \"\((keyPath as NSString).lastPathComponent)\":")
+        let value = secret(title: "Key passphrase", prompt: "Passphrase for key \"\((keyPath as NSString).lastPathComponent)\":")
+        if let value { cached.passphrases[keyPath] = value }
+        return value
     }
 
     private func secret(title: String, prompt: String) -> String? {

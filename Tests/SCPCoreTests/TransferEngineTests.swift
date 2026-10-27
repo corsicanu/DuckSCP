@@ -106,3 +106,37 @@ import Testing
         #expect(!RemotePath.isSafeName("..") && !RemotePath.isSafeName("a/b") && RemotePath.isSafeName("a b"))
     }
 }
+
+@Suite struct TransferQueueTests {
+    @Test func processesItemsInOrderOnItsOwnConnection() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("q-" + UUID().uuidString)
+        let src = root.appendingPathComponent("src"), dst = root.appendingPathComponent("dst")
+        for d in [src, dst] { try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true) }
+        for i in 0..<3 { try Data("file \(i)".utf8).write(to: src.appendingPathComponent("f\(i).txt")) }
+
+        var connects = 0
+        let queue = TransferQueue { connects += 1; return LocalFileSystem() }
+        let items = (0..<3).map { TransferQueue.Item(upload: [src.appendingPathComponent("f\($0).txt")], to: dst.path) }
+        let cancelled = TransferQueue.Item(upload: [src.appendingPathComponent("f0.txt")], to: root.path)
+        queue.cancel(cancelled) // cancelled before it starts: never runs
+        items.forEach(queue.add)
+        queue.add(cancelled)
+
+        for _ in 0..<100 where queue.hasActiveItems { try await Task.sleep(nanoseconds: 20_000_000) }
+        #expect(items.allSatisfy { $0.state == .done })
+        #expect(cancelled.state == .cancelled)
+        #expect(connects == 1)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dst.path).sorted() == ["f0.txt", "f1.txt", "f2.txt"])
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("f0.txt").path))
+        queue.removeFinished()
+        #expect(queue.items.isEmpty)
+    }
+
+    @Test func failedItemsReportErrors() async throws {
+        let queue = TransferQueue { LocalFileSystem() }
+        let item = TransferQueue.Item(upload: [URL(fileURLWithPath: "/nonexistent/\(UUID())")], to: NSTemporaryDirectory())
+        queue.add(item)
+        for _ in 0..<100 where queue.hasActiveItems { try await Task.sleep(nanoseconds: 20_000_000) }
+        guard case .failed = item.state else { Issue.record("expected failure, got \(item.state)"); return }
+    }
+}

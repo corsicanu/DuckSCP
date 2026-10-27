@@ -45,7 +45,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if args.contains("--demo-commander") {
             // Development aid: a Commander tab whose "remote" side is the local disk.
             let site = Site(path: "Demo", hostName: "localhost", userName: NSUserName())
-            attach(RemoteSession(site: site, fs: LocalFileSystem()))
+            attach(RemoteSession(site: site, fs: LocalFileSystem()) { LocalFileSystem() })
+            if let tab = commander?.current {
+                // Show the queue with one finished demo transfer.
+                let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("macscp-demo-\(UUID().uuidString)")
+                try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+                let file = tmp.appendingPathComponent("demo.bin")
+                try? Data(count: 300_000).write(to: file)
+                let out = tmp.appendingPathComponent("out")
+                try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+                tab.queue.add(TransferQueue.Item(upload: [file], to: out.path))
+                commander?.transfers.setQueueVisible(true)
+            }
         }
 
         if let snapshotDir {
@@ -98,7 +109,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let result = Result<RemoteSession, Error> {
                 let fs = try Connector.connect(site: site, password: password, prompter: dialog, hostKeys: hostKeys)
                 if dialog.isCancelled { fs.close(); throw FileSystemError.cancelled }
-                return RemoteSession(site: site, fs: fs)
+                let cached = dialog.cached
+                if cached.password == nil { cached.password = password }
+                return RemoteSession(site: site, fs: fs) {
+                    try Connector.connect(site: site, password: cached.password, prompter: cached, hostKeys: hostKeys)
+                }
             }
             DispatchQueue.main.async { [self] in
                 dialog.close()
