@@ -93,6 +93,10 @@ Transfers over 100 KB go through a `.filepart` temp file and are renamed when co
 - **FTP/FTPS** uses the system libcurl with macOS's trust store. Listings use MLSD, then fall back to `LIST -a` and `LIST` (Unix and Windows/IIS formats). Untrusted certificates ask *Connect Anyway / Cancel*; the answer lasts for that session only and is never saved.
 - **Host keys** are checked against MacSCP's own cache, `~/.ssh/known_hosts` (read-only, hashed entries included) and keys imported from WinSCP.ini (ed25519 and RSA). An unknown key asks *Accept / Connect Once / Cancel*. A changed key shows WinSCP's "POTENTIAL SECURITY BREACH" warning with **Cancel** as the default button.
 
+## Large directories
+
+There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, FTP and locally; `LargeDirectoryTests` checks this on every protocol. Rows are drawn lazily, so the table stays responsive.
+
 ## Security
 
 - Passwords are stored in the macOS Keychain (`WhenUnlockedThisDeviceOnly`, no iCloud sync). They are never written to disk.

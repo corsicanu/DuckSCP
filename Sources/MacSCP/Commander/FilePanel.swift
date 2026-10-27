@@ -311,6 +311,18 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     private func sortAndReload() {
         let sd = table.sortDescriptors.first ?? NSSortDescriptor(key: PanelColumn.name.rawValue, ascending: true)
         let key = PanelColumn(rawValue: sd.key ?? "") ?? .name
+        // Type names come from UTType lookups: compute once per extension, not per comparison
+        // (25k entries ≈ 375k comparisons).
+        var typeCache: [String: String] = [:]
+        if key == .type {
+            for e in entries where !e.isDirectoryLike {
+                let ext = (e.name as NSString).pathExtension
+                if typeCache[ext] == nil { typeCache[ext] = typeName(e) }
+            }
+        }
+        func cachedType(_ e: RemoteEntry) -> String {
+            e.isDirectoryLike ? "File folder" : typeCache[(e.name as NSString).pathExtension] ?? ""
+        }
         entries.sort { a, b in
             // Directories always first, as in WinSCP.
             if a.isDirectoryLike != b.isDirectoryLike { return a.isDirectoryLike }
@@ -320,7 +332,7 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
             case .changed: ordered = (a.modified ?? .distantPast).compare(b.modified ?? .distantPast)
             case .rights, .attr: ordered = a.rightsString.compare(b.rightsString)
             case .owner: ordered = a.owner.compare(b.owner)
-            case .type: ordered = typeName(a).compare(typeName(b))
+            case .type: ordered = cachedType(a).compare(cachedType(b))
             case .name: ordered = .orderedSame
             }
             let result = ordered == .orderedSame ? a.name.localizedStandardCompare(b.name) : ordered

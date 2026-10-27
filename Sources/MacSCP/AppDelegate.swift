@@ -53,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if args.contains("--demo-commander") {
             // Development aid: a Commander tab whose "remote" side is the local disk.
-            let site = Site(path: "Demo", hostName: "localhost", userName: NSUserName())
+            let demoPath = value(after: "--demo-path", in: args) ?? ""
+            let site = Site(path: "Demo", hostName: "localhost", userName: NSUserName(), remoteDirectory: demoPath, localDirectory: demoPath)
             attach(RemoteSession(site: site, fs: LocalFileSystem()) { LocalFileSystem() })
             if let tab = commander?.current {
                 // Show the queue with one finished demo transfer.
