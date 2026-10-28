@@ -1,6 +1,14 @@
 # Changelog
 
-## 1.0.2 (2026-10-28)
+## 1.0.3 (2026-10-28)
+
+Replaces 1.0.2, which was withdrawn. It includes everything from 1.0.2 below, plus:
+
+- **Fixed: browsing one panel moved the other.** Synchronized browsing was a saved, global setting whose toolbar button never showed its state, so one stray click (or ⇧⌘B) left it on for every session. It's now per session and off on every new connection, like WinSCP. When on, the toolbar shows "Sync Browsing: On", the status bar shows a badge, and the Commands menu item has a checkmark. A previously saved "on" is ignored.
+
+Release notes: [docs/releases/v1.0.3.md](docs/releases/v1.0.3.md).
+
+## 1.0.2 (2026-10-28, withdrawn; shipped in 1.0.3)
 
 - **No more Keychain prompts after updates:** releases are signed with a stable certificate, so macOS treats each version as the same app. Updating from 1.0.0/1.0.1 asks one last time (Always Allow).
 - **Updates must come from the same signer:** the built-in updater refuses packages signed by a different certificate.

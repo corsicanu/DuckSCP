@@ -28,7 +28,6 @@ public struct Preferences: Codable, Equatable {
     public var sizeFormat: SizeFormat = .short
     public var doubleClickAction: DoubleClickAction = .edit
     public var useTrashForLocalDelete = true
-    public var synchronizedBrowsing = false
 
     // MARK: Editors
     /// Tried in order; the first installed one opens files (F4 / Edit).
@@ -91,7 +90,7 @@ public struct Preferences: Codable, Equatable {
         get(.confirmDelete, &confirmDelete); get(.confirmOverwrite, &confirmOverwrite)
         get(.confirmExitWithTransfers, &confirmExitWithTransfers); get(.confirmDisconnect, &confirmDisconnect)
         get(.showHiddenFiles, &showHiddenFiles); get(.sizeFormat, &sizeFormat); get(.doubleClickAction, &doubleClickAction)
-        get(.useTrashForLocalDelete, &useTrashForLocalDelete); get(.synchronizedBrowsing, &synchronizedBrowsing)
+        get(.useTrashForLocalDelete, &useTrashForLocalDelete)
         get(.editorBundleIDs, &editorBundleIDs); get(.customEditorPath, &customEditorPath)
         get(.preserveTimestamp, &preserveTimestamp); get(.preservePermissions, &preservePermissions)
         get(.resumeEnabled, &resumeEnabled); get(.resumeThresholdKB, &resumeThresholdKB)

@@ -132,7 +132,7 @@ Organised like WinSCP's Preferences dialog:
 |---|---|
 | Environment | Theme (follow system / light / dark), interface (Commander / Explorer) |
 | Confirmations | Delete, overwrite, quit with queued transfers, close session |
-| Panels | Hidden files (⇧⌘.), size format (default short, e.g. "14 KB"), double-click action (open / edit / copy), local delete to Trash, synchronized browsing. Folders always sort first. |
+| Panels | Hidden files (⇧⌘.), size format (default short, e.g. "14 KB"), double-click action (open / edit / copy), local delete to Trash. Folders always sort first. |
 | Editors | F4 opens **Sublime Text** (4, 3 or 2), falling back to **TextEdit**. A custom editor app can be chosen. |
 | Transfer | Preserve timestamp and permissions, resume with `.filepart` and threshold, speed limit, exclude mask (`*.tmp; .git/`), background by default |
 | Endurance | Auto-reconnect: on/off, attempts, delay |
@@ -188,7 +188,7 @@ On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu.
 
 **Find Files** (⇧⌘F) searches the remote tree by mask (`*.log; report*`) on its own connection, so the panels stay usable. Double-click a result to show it in the remote panel.
 
-**Synchronized browsing** (⇧⌘B or toolbar) mirrors "open folder" and "go up" from one panel in the other.
+**Synchronized browsing** (⇧⌘B or toolbar) mirrors "open folder" and "go up" from one panel in the other. It's per session and off on every new connection, like WinSCP. While it's on, the toolbar says *Sync Browsing: On* and the status bar shows a badge.
 
 **Explorer interface** (Preferences → Environment): remote panel only, with Finder as the local side. Drag remote files or folders straight into Finder; they download where you drop them.
 

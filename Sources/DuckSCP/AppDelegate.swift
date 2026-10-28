@@ -80,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
                 tab.queue.add(TransferQueue.Item(upload: [file], to: out.path))
                 commander?.transfers.setQueueVisible(true)
+                if args.contains("--demo-sync") { commander?.toggleSynchronizedBrowsing() }
                 if let name = value(after: "--demo-enter", in: args) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1) { tab.local.load(RemotePath.join(tab.local.path, name)) }
                 }
@@ -348,6 +349,8 @@ enum Snapshot {
     /// Imports the sample ini, writes PNGs of the app windows, then quits.
     static func run(to dir: URL, app: AppDelegate) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // Panel paths, for scripted checks.
+        for tab in app.commander?.tabs ?? [] { print("panels: local=\(tab.local.path) remote=\(tab.remote.path)") }
         for (i, window) in NSApp.windows.enumerated() where window.isVisible {
             window.writeSnapshot(to: dir.appendingPathComponent("window-\(i).png"))
         }

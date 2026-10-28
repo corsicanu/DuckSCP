@@ -9,6 +9,8 @@ final class SessionTab {
     let remote: FilePanel
     let queue: TransferQueue
     var lastActive: FilePanel
+    /// WinSCP-style synchronized browsing: per session, off on every new connection, never saved.
+    var synchronizedBrowsing = false
 
     init(session: RemoteSession, localBackend: PanelBackend = LocalBackend()) {
         self.session = session
@@ -46,6 +48,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     private let split = NSSplitView()
     private let statusBytes = label("")
     private let statusSummary = label("")
+    private let statusSync = label("⛓ Synchronized browsing")
     private let statusProtocol = StatusPill()
     private let statusTime = label("")
     private var timer: Timer?
@@ -124,7 +127,10 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
             $0.textColor = .secondaryLabelColor
         }
         statusTime.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        let status = NSStackView(views: [statusSummary, statusBytes, NSView(), statusProtocol, statusTime])
+        statusSync.font = .systemFont(ofSize: 11, weight: .medium)
+        statusSync.textColor = .controlAccentColor
+        statusSync.isHidden = true
+        let status = NSStackView(views: [statusSummary, statusBytes, statusSync, NSView(), statusProtocol, statusTime])
         status.spacing = 12
         status.translatesAutoresizingMaskIntoConstraints = false
         status.edgeInsets = NSEdgeInsets(top: 3, left: 12, bottom: 6, right: 12)
@@ -233,6 +239,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         split.setPosition(split.bounds.width / 2, ofDividerAt: 0)
         applyInterface()
         rebuildTabBar()
+        updateSyncBrowsingIndicators()
         transfers.showQueue(of: tab)
         tab.lastActive.focus()
         panelDidBecomeActive(tab.lastActive)
@@ -335,7 +342,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
             panel.navigatedBySync = false // this move was the mirror of the other panel's
             return
         }
-        guard currentPrefs.synchronizedBrowsing, let other = otherPanel(panel),
+        guard current?.synchronizedBrowsing == true, let other = otherPanel(panel),
               let old = panel.previousPath, old != panel.path else { return }
         if RemotePath.parent(panel.path) == old {
             other.navigatedBySync = true
@@ -347,8 +354,22 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     }
 
     @objc func toggleSynchronizedBrowsing() {
-        try? (NSApp.delegate as? AppDelegate)?.prefs.update { $0.synchronizedBrowsing.toggle() }
-        flashStatus("Synchronized browsing \(currentPrefs.synchronizedBrowsing ? "on" : "off")")
+        guard let tab = current else { return NSSound.beep() }
+        tab.synchronizedBrowsing.toggle()
+        updateSyncBrowsingIndicators()
+        flashStatus("Synchronized browsing \(tab.synchronizedBrowsing ? "on" : "off")")
+    }
+
+    /// Shows whether synchronized browsing is on: toolbar icon/label and a status-bar badge.
+    private func updateSyncBrowsingIndicators() {
+        let on = current?.synchronizedBrowsing == true
+        if let item = window?.toolbar?.items.first(where: { $0.itemIdentifier == ToolbarID.syncBrowse }) {
+            item.image = NSImage(systemSymbolName: on ? "link.circle.fill" : "link", accessibilityDescription: item.label)
+            item.label = on ? "Sync Browsing: On" : "Sync Browsing"
+            item.toolTip = on ? "Synchronized browsing is on: folder changes are mirrored in the other panel. Click to turn off."
+                              : "Mirror folder changes between the panels"
+        }
+        statusSync.isHidden = !on
     }
 
     private var findWindows: [FindFilesWindow] = []
@@ -592,6 +613,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     // MARK: Keyboard (F-keys work through the Files menu key equivalents)
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        current != nil
+        if item.action == #selector(toggleSynchronizedBrowsing) { item.state = current?.synchronizedBrowsing == true ? .on : .off }
+        return current != nil
     }
 }

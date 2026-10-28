@@ -74,7 +74,6 @@ final class PreferencesWindowController: NSWindowController {
                 popup("Double-click on a file:", [("Open (default app)", Preferences.DoubleClickAction.open),
                                                   ("Edit (text editor)", .edit), ("Copy to other panel", .copy)], \.doubleClickAction),
                 check("Move deleted local files to the Trash", \.useTrashForLocalDelete),
-                check("Synchronized browsing", \.synchronizedBrowsing),
                 [NSView(), note("Folders are always listed before files.")],
             ]),
             ("Editors", [
