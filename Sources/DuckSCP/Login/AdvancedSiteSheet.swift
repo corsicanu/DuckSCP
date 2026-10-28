@@ -16,6 +16,7 @@ final class AdvancedSiteSheet: NSWindowController {
     private let compression = NSButton(checkboxWithTitle: "Enable SSH compression", target: nil, action: nil)
     private let timeOffset = textField(80)
     private let s3Region = textField(160)
+    private let rememberDir = NSButton(checkboxWithTitle: "Remember last used directory", target: nil, action: nil)
     private let proxyKind = NSPopUpButton()
     private let proxyHost = textField(200)
     private let proxyPort = textField(70)
@@ -42,6 +43,7 @@ final class AdvancedSiteSheet: NSWindowController {
         compression.isEnabled = site.fileProtocol == .sftp || site.fileProtocol == .scp
         timeOffset.stringValue = site.timeOffsetHours == 0 ? "0" : String(site.timeOffsetHours)
         timeOffset.toolTip = "Hours added to remote file times, for servers that list times in another time zone."
+        rememberDir.state = site.rememberLastDirectory ? .on : .off
         s3Region.stringValue = site.s3Region
         s3Region.isEnabled = site.fileProtocol == .s3
         ProxySettings.Kind.allCases.forEach { proxyKind.addItem(withTitle: $0.title) }
@@ -58,6 +60,7 @@ final class AdvancedSiteSheet: NSWindowController {
             [label("Private key file:"), keyField, button("…", self, #selector(browseKey))],
             [label("Remote directory:"), remoteDirField, NSGridCell.emptyContentView],
             [label("Local directory:"), localDirField, button("…", self, #selector(browseLocal))],
+            [NSGridCell.emptyContentView, rememberDir, NSGridCell.emptyContentView],
             [label("Note:"), noteField, NSGridCell.emptyContentView],
             [NSGridCell.emptyContentView, scpFallback, NSGridCell.emptyContentView],
             [NSGridCell.emptyContentView, passive, NSGridCell.emptyContentView],
@@ -116,6 +119,7 @@ final class AdvancedSiteSheet: NSWindowController {
         site.ftpPassive = passive.state == .on
         site.sshCompression = compression.state == .on
         site.timeOffsetHours = Double(timeOffset.stringValue.replacingOccurrences(of: ",", with: ".")) ?? 0
+        site.rememberLastDirectory = rememberDir.state == .on
         site.s3Region = s3Region.stringValue.trimmingCharacters(in: .whitespaces)
         site.proxy.kind = ProxySettings.Kind.allCases[max(0, proxyKind.indexOfSelectedItem)]
         site.proxy.host = proxyHost.stringValue.trimmingCharacters(in: .whitespaces)

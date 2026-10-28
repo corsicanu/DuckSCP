@@ -81,6 +81,24 @@ public final class SiteStore {
         return "\(path) (\(n))"
     }
 
+    /// Records where a session ended up, if the site wants that. Returns true if saved.
+    @discardableResult
+    public func rememberDirectories(of id: UUID, remote: String?, local: String?) throws -> Bool {
+        guard let i = sites.firstIndex(where: { $0.id == id }), sites[i].rememberLastDirectory else { return false }
+        var changed = false
+        if let remote, !remote.isEmpty, sites[i].remoteDirectory != remote { sites[i].remoteDirectory = remote; changed = true }
+        if let local, !local.isEmpty, sites[i].localDirectory != local { sites[i].localDirectory = local; changed = true }
+        if changed { try save() }
+        return changed
+    }
+
+    /// Drops the import notes (the ⚠︎ in the site tree) once they no longer matter.
+    public func clearWarnings(of id: UUID) throws {
+        guard let i = sites.firstIndex(where: { $0.id == id }), !sites[i].importWarnings.isEmpty else { return }
+        sites[i].importWarnings = []
+        try save()
+    }
+
     /// Saves (or replaces, by name) a workspace. `passwords` are keyed by the sites' ids.
     public func saveWorkspace(_ workspace: Workspace, passwords: [UUID: String] = [:]) throws {
         if let old = workspaces.first(where: { $0.name == workspace.name }) {

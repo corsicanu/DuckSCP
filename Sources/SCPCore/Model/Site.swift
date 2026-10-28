@@ -59,6 +59,8 @@ public struct Site: Codable, Equatable, Identifiable {
     public var proxy = ProxySettings()
     /// S3 signing region (WinSCP: S3 → Default region).
     public var s3Region = "us-east-1"
+    /// Open next time where you left off (WinSCP: Directories → Remember last used directory).
+    public var rememberLastDirectory = true
     /// Problems found during import that the user should look at.
     public var importWarnings: [String]
 
@@ -111,6 +113,7 @@ public struct Site: Codable, Equatable, Identifiable {
         timeOffsetHours = try c.decodeIfPresent(Double.self, forKey: .timeOffsetHours) ?? 0
         proxy = (try? c.decode(ProxySettings.self, forKey: .proxy)) ?? ProxySettings()
         s3Region = (try? c.decode(String.self, forKey: .s3Region)) ?? "us-east-1"
+        rememberLastDirectory = (try? c.decode(Bool.self, forKey: .rememberLastDirectory)) ?? true
     }
 
     public static func defaultPort(_ p: FileProtocol, _ enc: FtpEncryption) -> Int {

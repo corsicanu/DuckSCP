@@ -235,7 +235,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 switch result {
                 case .success(let session):
                     passwordsForWorkspace[site.id] = dialog.cached.password // main thread only
+                    // Connected fine, so the import notes (⚠︎) have served their purpose.
+                    if store.site(site.id)?.importWarnings.isEmpty == false {
+                        try? store.clearWarnings(of: site.id)
+                        loginWindow?.siteChangedElsewhere(site.id)
+                    }
                     attach(session)
+                    // Test aid: navigate the remote panel, as a user would.
+                    if let target = value(after: "--test-navigate", in: CommandLine.arguments), let tab = commander?.current {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { tab.remote.load(target) }
+                    }
                     // Test aid: start editing a remote file, as F4 would (editor not launched in snapshot runs).
                     if let name = value(after: "--demo-edit", in: CommandLine.arguments), let tab = commander?.current {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [self] in
@@ -304,6 +313,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if commander == nil {
             let c = CommanderWindowController()
             c.onNewSession = { [weak self] in self?.showLogin() }
+            c.onRememberDirectories = { [weak self] id, remote, local in
+                guard let self, (try? self.store.rememberDirectories(of: id, remote: remote, local: local)) == true else { return }
+                self.loginWindow?.siteChangedElsewhere(id)
+            }
             commander = c
             NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: c.window, queue: .main) { [weak self] _ in
                 self?.commander = nil

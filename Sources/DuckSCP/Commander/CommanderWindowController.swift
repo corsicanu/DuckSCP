@@ -29,6 +29,17 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
     private(set) var tabs: [SessionTab] = []
     private(set) var current: SessionTab?
     var onNewSession: (() -> Void)?
+    /// (site id, remote folder, local folder): called after navigating, debounced.
+    var onRememberDirectories: ((UUID, String, String) -> Void)?
+    private var rememberWork: DispatchWorkItem?
+
+    private func rememberDirectories(of tab: SessionTab, now: Bool = false) {
+        rememberWork?.cancel()
+        let id = tab.session.site.id, remote = tab.remote.path, local = tab.local.path
+        let work = DispatchWorkItem { [weak self] in self?.onRememberDirectories?(id, remote, local) }
+        rememberWork = work
+        if now { work.perform() } else { DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work) }
+    }
     var transfers: TransferController!
 
     private let tabBar = SessionTabStrip()
@@ -255,6 +266,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
             a.addButton(withTitle: "Cancel")
             guard a.runModal() == .alertFirstButtonReturn else { return }
         }
+        rememberDirectories(of: tab, now: true)
         tab.queue.close()
         tab.session.close()
         tabs.remove(at: i)
@@ -313,6 +325,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     func panelPathDidChange(_ panel: FilePanel) {
         updateTitle()
+        if let tab = tabs.first(where: { $0.local === panel || $0.remote === panel }) { rememberDirectories(of: tab) }
         syncBrowse(from: panel)
     }
 
@@ -572,7 +585,7 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
 
     func windowWillClose(_ notification: Notification) {
         timer?.invalidate()
-        tabs.forEach { $0.queue.close(); $0.session.close() }
+        tabs.forEach { rememberDirectories(of: $0, now: true); $0.queue.close(); $0.session.close() }
         tabs.removeAll()
     }
 

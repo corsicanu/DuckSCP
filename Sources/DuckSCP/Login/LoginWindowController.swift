@@ -184,6 +184,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
         m.add("Clone to New Site", #selector(clone), target: self)
         m.add("Delete", #selector(deleteSelected), target: self)
         m.add("Forget Password", #selector(forgetPassword), target: self)
+        m.add("Clear Warnings", #selector(clearWarnings), target: self)
         return m
     }
 
@@ -393,6 +394,7 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
 
     @objc private func save() {
         readFields()
+        draft.importWarnings = [] // saving means the user has reviewed the site
         if let id = selectedID, store.site(id) != nil {
             persist(draft, password: passwordField.stringValue.isEmpty ? nil : passwordField.stringValue)
         } else {
@@ -491,6 +493,19 @@ final class LoginWindowController: NSWindowController, NSOutlineViewDataSource, 
             guard r == .alertFirstButtonReturn else { return }
             do { try action(); reloadTree(select: nil) } catch { showError(error, in: window) }
         }
+    }
+
+    @objc private func clearWarnings() {
+        guard let id = selectedID else { return NSSound.beep() }
+        do { try store.clearWarnings(of: id); reloadTree(select: id) } catch { showError(error, in: window) }
+    }
+
+    /// The store changed outside this window (remembered folders, cleared warnings):
+    /// refresh the tree and, if that site is shown, its fields.
+    func siteChangedElsewhere(_ id: UUID) {
+        let keep = selectedID
+        reloadTree(select: keep)
+        if keep == id, let s = store.site(id) { draft = s; loadFields() }
     }
 
     @objc private func forgetPassword() {

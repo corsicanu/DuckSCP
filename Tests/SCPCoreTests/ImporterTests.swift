@@ -130,3 +130,44 @@ private func fixture() throws -> Data {
         #expect(SiteStore(fileURL: url, secrets: secrets).sites.count == store.sites.count)
     }
 }
+
+@Suite struct RememberDirectoryTests {
+    func store() throws -> (SiteStore, URL) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rd-\(UUID())/sites.json")
+        let s = SiteStore(fileURL: url, secrets: InMemorySecretStore())
+        try s.upsert(Site(path: "a", hostName: "h", remoteDirectory: "/old", localDirectory: "/Users/x/old",
+                          importWarnings: ["Windows local directory dropped."]))
+        return (s, url)
+    }
+
+    @Test func remembersAndPersists() throws {
+        let (s, url) = try store()
+        let id = s.sites[0].id
+        #expect(try s.rememberDirectories(of: id, remote: "/var/www/new", local: "/Users/x/new"))
+        #expect(try !s.rememberDirectories(of: id, remote: "/var/www/new", local: "/Users/x/new")) // no change, no write
+        let reloaded = SiteStore(fileURL: url, secrets: InMemorySecretStore())
+        #expect(reloaded.sites[0].remoteDirectory == "/var/www/new" && reloaded.sites[0].localDirectory == "/Users/x/new")
+    }
+
+    @Test func respectsOptOutAndUnknownSites() throws {
+        let (s, _) = try store()
+        var site = s.sites[0]
+        site.rememberLastDirectory = false
+        try s.upsert(site)
+        #expect(try !s.rememberDirectories(of: site.id, remote: "/x", local: nil))
+        #expect(s.sites[0].remoteDirectory == "/old")
+        #expect(try !s.rememberDirectories(of: UUID(), remote: "/x", local: nil)) // unsaved session
+    }
+
+    @Test func clearsWarnings() throws {
+        let (s, url) = try store()
+        try s.clearWarnings(of: s.sites[0].id)
+        #expect(SiteStore(fileURL: url, secrets: InMemorySecretStore()).sites[0].importWarnings.isEmpty)
+    }
+
+    @Test func oldFilesDefaultToRemembering() throws {
+        let json = #"[{"path":"legacy","hostName":"h"}]"#
+        let site = try JSONDecoder().decode([Site].self, from: Data(json.utf8))[0]
+        #expect(site.rememberLastDirectory)
+    }
+}

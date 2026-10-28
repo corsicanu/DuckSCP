@@ -111,7 +111,7 @@ Upgrading from the earlier working name (MacSCP): on first launch, DuckSCP moves
 
 What is imported, per site: folder path, protocol (SFTP, SCP, FTP, WebDAV, S3), host, port, user, password, FTP encryption and passive mode, private key path, remote directory, note, colour.
 
-What needs attention afterwards (marked ⚠︎ in the site tree):
+What needs attention afterwards (marked ⚠︎ in the site tree; the mark clears after the first successful connection, when you press Save, or via Manage → Clear Warnings):
 - **Windows paths.** Local directories like `C:\…` are dropped. Key files are looked up by file name in `~/.ssh`; if missing, pick them in **Advanced…**.
 - **Workspaces** import as workspaces: open them from the Login tree (Login opens every session as a tab). Save your own with Session → Save Workspace (⇧⌘S).
 - **Master password:** you are asked for it and it is checked against the file's verifier, then all passwords are decrypted. Skip it to import the sites without passwords.
@@ -136,7 +136,7 @@ Organised like WinSCP's Preferences dialog:
 | Logging | Session log (default `~/Library/Logs/DuckSCP/session.log`). Paths and errors only, never passwords. |
 | Security | Clear cached host keys |
 
-Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional user and password; the password is a separate Keychain entry), SSH compression and a timezone offset, on top of the key, directories, SCP fallback and passive mode. Importing a `WinSCP.ini` also brings over the WinSCP preferences it recognises (confirmations, hidden files, double-click action, preserve time and rights, resume, speed limit) and per-site Compression / TimeDifference / proxy settings.
+Per site (Advanced…): **remember last used directory** (on by default: a site reopens in the remote and local folders where you left it), **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional user and password; the password is a separate Keychain entry), SSH compression and a timezone offset, on top of the key, directories, SCP fallback and passive mode. Importing a `WinSCP.ini` also brings over the WinSCP preferences it recognises (confirmations, hidden files, double-click action, preserve time and rights, resume, speed limit) and per-site Compression / TimeDifference / proxy settings.
 
 ## Appearance
 
