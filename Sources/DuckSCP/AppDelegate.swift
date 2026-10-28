@@ -9,6 +9,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
+        // Test aid: write/read one Keychain item and quit (checks prompt-free access across builds).
+        if let mode = value(after: "--keychain-selftest", in: args) {
+            let store = KeychainSecretStore(service: Branding.bundleID + ".selftest")
+            let id = UUID(uuidString: "00000000-0000-0000-0000-00000000D0C5")!
+            if mode == "write" { try? store.setPassword("selftest-ok", for: id) }
+            if mode == "delete" { try? store.setPassword(nil, for: id) }
+            print("keychain-selftest \(mode): \(store.password(for: id) ?? "nil")")
+            exit(0)
+        }
         RemoteEditSession.removeStaleCopies()
         if !args.contains("--data-dir") && !args.contains("--snapshot") { LegacyMigration.run() }
         let snapshotDir = value(after: "--snapshot", in: args)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import CryptoKit
 import Foundation
+import Security
 
 /// Semantic version ("1.0.1", "v1.1.0-beta.2"). Pre-releases sort before their release.
 public struct SemVer: Comparable, CustomStringConvertible {
@@ -71,7 +72,7 @@ public enum Updater {
     }
 
     public enum UpdateError: Error, CustomStringConvertible {
-        case noPackage, checksumMissing, checksumMismatch, badPackage(String), notWritable(String)
+        case noPackage, checksumMissing, checksumMismatch, badPackage(String), notWritable(String), differentSigner
 
         public var description: String {
             switch self {
@@ -80,6 +81,7 @@ public enum Updater {
             case .checksumMismatch: return "The downloaded update is damaged (checksum mismatch). Nothing was changed."
             case .badPackage(let why): return "The downloaded update is not valid: \(why). Nothing was changed."
             case .notWritable(let path): return "DuckSCP cannot replace itself at \(path). Download the update from the release page instead."
+            case .differentSigner: return "The update is signed by a different certificate than this copy of DuckSCP, so it was not installed."
             }
         }
     }
@@ -151,6 +153,22 @@ public enum Updater {
         guard info["CFBundleIdentifier"] as? String == bundleID else { throw UpdateError.badPackage("it is a different app") }
         if let version, let v = (info["CFBundleShortVersionString"] as? String).flatMap(SemVer.init), v != version {
             throw UpdateError.badPackage("it is version \(v), not \(version)")
+        }
+    }
+
+    /// The new app must satisfy the running app's designated requirement, i.e. be signed
+    /// by the same certificate. Skipped when the running app is signed ad hoc (its
+    /// requirement is its own code hash, which no other build can match).
+    public static func verifySameSigner(_ newApp: URL, as current: URL) throws {
+        var currentCode: SecStaticCode?, newCode: SecStaticCode?, requirement: SecRequirement?
+        guard SecStaticCodeCreateWithPath(current as CFURL, [], &currentCode) == errSecSuccess, let currentCode,
+              SecCodeCopyDesignatedRequirement(currentCode, [], &requirement) == errSecSuccess, let requirement else { return }
+        var text: CFString?
+        SecRequirementCopyString(requirement, [], &text)
+        if (text as String?)?.contains("cdhash") ?? true { return } // ad hoc: nothing stable to compare
+        guard SecStaticCodeCreateWithPath(newApp as CFURL, [], &newCode) == errSecSuccess, let newCode,
+              SecStaticCodeCheckValidity(newCode, SecCSFlags(rawValue: kSecCSCheckAllArchitectures), requirement) == errSecSuccess else {
+            throw UpdateError.differentSigner
         }
     }
 

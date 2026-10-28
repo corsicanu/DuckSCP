@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source ./branding.env
 APP_VERSION="${APP_VERSION_OVERRIDE:-$APP_VERSION}" # tests build other versions
+source scripts/signing_identity.sh
 SCRATCH="${SCRATCH:-$HOME/Library/Caches/DuckSCP-build}"
 
 swift build -c release --scratch-path "$SCRATCH" 2>&1 | grep -v "ld: warning: search path"
@@ -42,9 +43,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
-# Ad-hoc signature with the hardened runtime; a Developer ID goes here for public releases.
+# Hardened runtime. With a stable identity (self-signed or Developer ID) macOS sees every
+# version as the same app, so Keychain items stay readable without prompts after updates.
 xattr -cr "$APP"
-codesign --force --options runtime --sign "${SIGN_IDENTITY:--}" "$APP"
+codesign --force --options runtime --sign "$SIGN_IDENTITY" "$APP"
 echo "Built $APP"
 
 if [[ "${1:-}" == "--install" ]]; then

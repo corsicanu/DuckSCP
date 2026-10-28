@@ -152,3 +152,33 @@ final class FakeGitHub {
         }
     }
 }
+
+/// Same-signer check, using the "DuckSCP Self-Signed" identity when it is installed.
+@Suite(.enabled(if: {
+    let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+    p.arguments = ["find-certificate", "-c", "DuckSCP Self-Signed"]; p.standardOutput = Pipe(); p.standardError = Pipe()
+    try? p.run(); p.waitUntilExit(); return p.terminationStatus == 0
+}(), "needs the DuckSCP Self-Signed identity"))
+struct SameSignerTests {
+    func app(_ name: String, sign identity: String) throws -> URL {
+        let gh = FakeGitHub()
+        let app = FileManager.default.temporaryDirectory.appendingPathComponent("signer-\(UUID())/\(name).app")
+        try FileManager.default.createDirectory(at: app.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
+        (["CFBundleIdentifier": "test.signer", "CFBundleExecutable": "x", "CFBundlePackageType": "APPL"] as NSDictionary)
+            .write(to: app.appendingPathComponent("Contents/Info.plist"), atomically: true)
+        try FileManager.default.copyItem(atPath: "/usr/bin/true", toPath: app.appendingPathComponent("Contents/MacOS/x").path)
+        try gh.run("/usr/bin/codesign", ["--force", "--sign", identity, app.path])
+        return app
+    }
+
+    @Test func sameCertificateAcceptedOthersRefused() throws {
+        let installed = try app("Installed", sign: "DuckSCP Self-Signed")
+        try Updater.verifySameSigner(try app("Update", sign: "DuckSCP Self-Signed"), as: installed)
+        #expect(throws: Updater.UpdateError.self) { try Updater.verifySameSigner(try app("AdHoc", sign: "-"), as: installed) }
+    }
+
+    @Test func adHocInstallSkipsTheCheck() throws {
+        // 1.0.1 is ad hoc: it cannot express a signer requirement, so it accepts the first signed update.
+        try Updater.verifySameSigner(try app("Signed", sign: "DuckSCP Self-Signed"), as: try app("Old", sign: "-"))
+    }
+}

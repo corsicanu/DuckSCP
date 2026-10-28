@@ -8,13 +8,15 @@ source ./branding.env
 APP_VERSION="${APP_VERSION_OVERRIDE:-$APP_VERSION}"
 
 scripts/build_app.sh
+source scripts/signing_identity.sh 2>/dev/null
 # Package from a clean copy outside the repo: ~/Desktop may attach Finder metadata
 # that code signing rejects. The copy is re-signed (ad hoc, hardened runtime).
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 ditto --norsrc --noextattr --noqtn "build/$APP_NAME.app" "$WORK/$APP_NAME.app"
 APP="$WORK/$APP_NAME.app"
-codesign --force --options runtime --sign "${SIGN_IDENTITY:--}" "$APP"
+codesign --force --options runtime --sign "$SIGN_IDENTITY" "$APP"
+echo "Signed with: $SIGN_IDENTITY"
 ARCH="$(lipo -archs "$APP/Contents/MacOS/$APP_NAME" | tr ' ' '-')"
 BASE="$APP_NAME-$APP_VERSION-macOS-$ARCH"
 DIST="dist"

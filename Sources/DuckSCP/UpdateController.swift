@@ -126,6 +126,7 @@ final class UpdateController {
                     failed(e, r)
                 case .success(let app):
                     do {
+                        try Updater.verifySameSigner(app, as: Bundle.main.bundleURL)
                         try Updater.scheduleReplace(target: Bundle.main.bundleURL, with: app, afterExitOf: getpid(),
                                                     relaunch: !CommandLine.arguments.contains("--update-no-relaunch"))
                         NSApp.terminate(nil)

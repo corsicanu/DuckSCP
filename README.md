@@ -77,6 +77,10 @@ scripts/package.sh
 
 Builds a release into `dist/`: a drag-to-Applications `.dmg`, a `.zip` and `SHA256SUMS.txt`. Both packages are signature-checked by the script.
 
+**Signing:** builds use the identity named in `branding.env` (`SIGN_IDENTITY`), or ad hoc if it isn't in your keychain.
+- **Keep that certificate:** releases must keep using it, or existing installs will refuse the update and ask for Keychain access again.
+- **Back it up:** Keychain Access → My Certificates → DuckSCP Self-Signed → Export.
+
 ```bash
 scripts/test.sh
 ```
@@ -223,6 +227,10 @@ There is no entry limit. Folders with 20,000+ files list fully over SFTP, SCP, F
 ## Security
 
 - Passwords are stored in the macOS Keychain (`WhenUnlockedThisDeviceOnly`, no iCloud sync). They are never written to disk.
+- **Releases are signed with one stable certificate** ("DuckSCP Self-Signed"; it's self-made, so no Apple Developer ID). macOS therefore sees every version as the same app:
+  - saved passwords stay readable after updates without Keychain prompts;
+  - the updater refuses any new version not signed by that same certificate.
+- Coming from 1.0.0 or 1.0.1 (signed ad hoc), macOS asks one last time for your login keychain password. That's your Mac login password; click **Always Allow**.
 - Site settings live in `~/Library/Application Support/DuckSCP/sites.json`, with folder mode `0700` and file mode `0600`.
 - Host keys are cached in `host_keys.json` next to `sites.json`, mode `0600`.
 - File names received from servers are validated before anything is written locally, so `../` and `/` cannot escape the target folder.
