@@ -86,6 +86,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             loginWindow?.reloadTree(select: site.id)
         }
 
+        // Update check at launch (never in test/snapshot runs unless a test server is given).
+        if prefs.current.checkForUpdatesAtLaunch && !isSnapshotMode && (dataDir == nil || args.contains("--update-api")) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { UpdateController.shared.check(userInitiated: false) }
+        }
+
         if args.contains("--show-preferences") {
             if isSnapshotMode { loginWindow?.window?.orderOut(nil) } // one window per screenshot
             showPreferences()
@@ -171,6 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var preferencesWindow: PreferencesWindowController?
+
+    @objc func checkForUpdates() { UpdateController.shared.check(userInitiated: true) }
 
     @objc func showPreferences() {
         if preferencesWindow == nil { preferencesWindow = PreferencesWindowController(store: prefs, hostKeys: hostKeys) }

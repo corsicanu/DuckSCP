@@ -8,6 +8,7 @@ enum MainMenu {
 
         let appMenu = NSMenu()
         appMenu.add("About \(name)", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), "")
+        appMenu.add("Check for Updates…", #selector(AppDelegate.checkForUpdates), "")
         appMenu.addItem(.separator())
         appMenu.add("Preferences…", #selector(AppDelegate.showPreferences), ",")
         appMenu.addItem(.separator())

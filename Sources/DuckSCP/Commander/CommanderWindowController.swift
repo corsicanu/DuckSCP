@@ -198,11 +198,11 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         let tab = SessionTab(session: session, localBackend: localBackend)
         tab.local.delegate = self
         tab.remote.delegate = self
-        tab.local.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
+        tab.local.onDrop = { [weak self] panel, paths, from, dir in self?.dropped(paths, on: panel, from: from, target: dir) }
         tab.remote.promiseWriter = { [weak self] entry, dir, localDir, done in
             self?.transfers.downloadForPromise(entry, from: dir, to: localDir, session: session, completion: done)
         }
-        tab.remote.onDrop = { [weak self] target, paths, from in self?.dropped(paths, on: target, from: from) }
+        tab.remote.onDrop = { [weak self] panel, paths, from, dir in self?.dropped(paths, on: panel, from: from, target: dir) }
         transfers.attach(tab)
         let policy = { ReconnectPolicy(currentPrefs) }
         session.reconnectPolicy = policy
@@ -398,14 +398,15 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         transfers.confirmAndQueue(entries: src.selectedEntries, from: src, to: dst, move: move)
     }
 
-    private func dropped(_ paths: [String], on target: FilePanel, from source: FilePanel?) {
+    /// Every drop asks where to put the files (WinSCP behaviour): the folder dropped on
+    /// is suggested, alongside the history of earlier targets.
+    private func dropped(_ paths: [String], on target: FilePanel, from source: FilePanel?, target dir: String) {
         if let source {
             let wanted = Set(paths)
             let entries = source.entries.filter { wanted.contains(RemotePath.join(source.path, $0.name)) }
-            transfers.confirmAndQueue(entries: entries, from: source, to: target, move: false)
+            transfers.confirmAndQueue(entries: entries, from: source, to: target, move: false, defaultTarget: dir)
         } else if !target.backend.isLocal {
-            // Files dragged in from Finder.
-            transfers.uploadFromFinder(paths, to: target)
+            transfers.uploadFromFinder(paths, to: target, defaultTarget: dir) // dragged in from Finder
         }
     }
 
@@ -420,15 +421,20 @@ final class CommanderWindowController: NSWindowController, NSWindowDelegate, Fil
         }
     }
 
+    /// F2: rename in place, like Finder (the slow second click does the same).
     @objc func cmdRename() {
-        guard let panel = activePanel, let e = panel.selectedEntries.first, panel.selectedEntries.count == 1 else { return NSSound.beep() }
-        prompt(title: "Rename", message: "New name for \"\(e.name)\":", value: e.name) { [self] name in
-            guard name != e.name else { return }
-            guard RemotePath.isSafeName(name) else { return showError(FileSystemError(.other, "Invalid name."), in: window) }
-            run(on: panel, { try $0.rename(RemotePath.join(panel.path, e.name), to: RemotePath.join(panel.path, name)) }) { [self] r in
-                if case .failure(let err) = r { showError(err, in: window) }
-                panel.load(panel.path, recordHistory: false, select: name)
-            }
+        guard let panel = activePanel, panel.selectedEntries.count == 1, let row = panel.selectedRow else { return NSSound.beep() }
+        panel.beginInlineRename(row: row)
+    }
+
+    func panel(_ panel: FilePanel, rename e: RemoteEntry, to name: String) {
+        guard RemotePath.isSafeName(name) else {
+            showError(FileSystemError(.other, "\"\(name)\" is not a valid name."), in: window)
+            return panel.refresh()
+        }
+        run(on: panel, { try $0.rename(RemotePath.join(panel.path, e.name), to: RemotePath.join(panel.path, name)) }) { [self] r in
+            if case .failure(let err) = r { showError(err, in: window) }
+            panel.load(panel.path, recordHistory: false, select: name)
         }
     }
 

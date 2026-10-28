@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source ./branding.env
+APP_VERSION="${APP_VERSION_OVERRIDE:-$APP_VERSION}" # tests build other versions
 SCRATCH="${SCRATCH:-$HOME/Library/Caches/DuckSCP-build}"
 
 swift build -c release --scratch-path "$SCRATCH" 2>&1 | grep -v "ld: warning: search path"
@@ -31,6 +32,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleVersion</key><string>$(git rev-list --count HEAD 2>/dev/null || echo 0)</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>DuckUpdateRepo</key><string>${UPDATE_REPO:-}</string>
   <key>LegacyAppName</key><string>${LEGACY_APP_NAME:-}</string>
   <key>LegacyBundleID</key><string>${LEGACY_BUNDLE_ID:-}</string>
   <key>NSHumanReadableCopyright</key><string>$COPYRIGHT</string>

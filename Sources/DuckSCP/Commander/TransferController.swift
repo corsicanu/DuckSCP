@@ -67,62 +67,120 @@ final class TransferController {
 
     // MARK: Copy / Move
 
-    func confirmAndQueue(entries: [RemoteEntry], from src: FilePanel, to dst: FilePanel, move: Bool) {
+    struct TransferChoice {
+        var targetDir: String
+        var options: TransferEngine.Options
+        var background: Bool
+    }
+
+    /// WinSCP's Copy/Upload dialog: the target folder is an editable combo box offering
+    /// the folder you dropped on (or the other panel's folder) plus the global history
+    /// of earlier targets. Remote paths are not checked; local ones can be browsed.
+    func promptTarget(title: String, defaultTarget: String, upload: Bool, completion: @escaping (TransferChoice) -> Void) {
         guard let window = commander.window else { return }
-        let upload = src.backend.isLocal
-        options = currentPrefs.transferOptions
-        transferInBackground = currentPrefs.transferInBackgroundByDefault
-        let what = entries.count == 1 ? "\"\(entries[0].name)\"" : "\(entries.count) files"
+        var options = currentPrefs.transferOptions
         let alert = NSAlert()
-        alert.messageText = "\(move ? "Move" : "Copy") \(what) to \(upload ? "remote" : "local") directory:"
-        alert.addButton(withTitle: "OK")
+        alert.messageText = title
+        alert.addButton(withTitle: upload ? "Upload" : "Download")
         alert.addButton(withTitle: "Cancel")
-        let target = textField(380)
-        target.stringValue = dst.path
+
+        let combo = NSComboBox(frame: NSRect(x: 0, y: 0, width: 420, height: 26))
+        combo.completes = true
+        combo.numberOfVisibleItems = 12
+        var seen = Set<String>()
+        let history = upload ? currentPrefs.remoteTargetHistory : currentPrefs.localTargetHistory
+        for p in [defaultTarget] + history where seen.insert(p).inserted { combo.addItem(withObjectValue: p) }
+        combo.stringValue = defaultTarget
+        combo.toolTip = "Type a path or pick a recent one. Recent targets are shared by all sites."
+        combo.setAccessibilityLabel("Target folder")
+
+        var row: [NSView] = [combo]
+        if !upload {
+            let browse = NSButton(title: "Choose…", target: nil, action: nil)
+            browse.bezelStyle = .rounded
+            browseHandler = { [weak window] in
+                let panel = NSOpenPanel()
+                panel.canChooseDirectories = true
+                panel.canChooseFiles = false
+                panel.directoryURL = URL(fileURLWithPath: combo.stringValue)
+                if panel.runModal() == .OK, let url = panel.url { combo.stringValue = url.path }
+                _ = window
+            }
+            browse.target = self
+            browse.action = #selector(browseClicked)
+            row.append(browse)
+        }
+        let targetRow = NSStackView(views: row)
         let preserve = NSButton(checkboxWithTitle: "Preserve timestamp", target: nil, action: nil)
         preserve.state = options.preserveTimestamp ? .on : .off
         let perms = NSButton(checkboxWithTitle: "Set permissions from local files", target: nil, action: nil)
         perms.state = options.preservePermissions ? .on : .off
         perms.isHidden = !upload
         let background = NSButton(checkboxWithTitle: "Transfer in background (add to transfer queue)", target: nil, action: nil)
-        background.state = transferInBackground ? .on : .off
-        let stack = NSStackView(views: [target, preserve, perms, background])
+        background.state = currentPrefs.transferInBackgroundByDefault ? .on : .off
+        let stack = NSStackView(views: [label("Target folder:"), targetRow, preserve, perms, background])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.frame = NSRect(x: 0, y: 0, width: 380, height: upload ? 98 : 74)
+        stack.frame = NSRect(x: 0, y: 0, width: upload ? 420 : 520, height: upload ? 124 : 100)
         alert.accessoryView = stack
-        alert.window.initialFirstResponder = target
+        alert.window.initialFirstResponder = combo
         alert.beginSheetModal(for: window) { [self] r in
+            browseHandler = nil
             guard r == .alertFirstButtonReturn else { return }
+            let dir = combo.stringValue.trimmingCharacters(in: .whitespaces)
+            let target = dir.isEmpty ? defaultTarget : dir
             options.preserveTimestamp = preserve.state == .on
             options.preservePermissions = perms.state == .on
-            transferInBackground = background.state == .on
-            let dir = target.stringValue.trimmingCharacters(in: .whitespaces)
-            if transferInBackground, let tab = commander.current {
-                let targetDir = dir.isEmpty ? dst.path : dir
+            try? (NSApp.delegate as? AppDelegate)?.prefs.update {
+                if upload { Preferences.remember(target, in: &$0.remoteTargetHistory) }
+                else { Preferences.remember(target, in: &$0.localTargetHistory) }
+            }
+            completion(TransferChoice(targetDir: target, options: options, background: background.state == .on))
+        }
+    }
+
+    private var browseHandler: (() -> Void)?
+    @objc private func browseClicked() { browseHandler?() }
+
+    /// F5/F6 and drags between the panels.
+    func confirmAndQueue(entries: [RemoteEntry], from src: FilePanel, to dst: FilePanel, move: Bool, defaultTarget: String? = nil) {
+        let upload = src.backend.isLocal
+        let what = entries.count == 1 ? "\"\(entries[0].name)\"" : "\(entries.count) items"
+        promptTarget(title: "\(move ? "Move" : upload ? "Upload" : "Download") \(what) to:", defaultTarget: defaultTarget ?? dst.path,
+                     upload: upload) { [self] choice in
+            options = choice.options
+            if choice.background, let tab = commander.current {
                 let item = upload
                     ? TransferQueue.Item(upload: entries.map { URL(fileURLWithPath: RemotePath.join(src.path, $0.name)) },
-                                         to: targetDir, move: move, options: options)
-                    : TransferQueue.Item(download: entries, from: src.path, to: targetDir, move: move, options: options)
+                                         to: choice.targetDir, move: move, options: choice.options)
+                    : TransferQueue.Item(download: entries, from: src.path, to: choice.targetDir, move: move, options: choice.options)
                 tab.queue.add(item)
                 setQueueVisible(true)
                 return
             }
-            run(entries: entries, srcDir: src.path, upload: upload, targetDir: dir.isEmpty ? dst.path : dir,
-                move: move, session: sessionOf(src, dst)) {
+            run(entries: entries, srcDir: src.path, upload: upload, targetDir: choice.targetDir, move: move,
+                session: sessionOf(src, dst)) {
                 src.refresh()
                 dst.refresh()
             }
         }
     }
 
-    func uploadFromFinder(_ paths: [String], to panel: FilePanel) {
-        guard let session = (panel.backend as? RemoteBackend)?.session else { return }
+    /// Files dropped from Finder onto the remote panel: asks where to put them first.
+    func uploadFromFinder(_ paths: [String], to panel: FilePanel, defaultTarget: String) {
+        guard let session = (panel.backend as? RemoteBackend)?.session, let tab = commander.current else { return }
         let urls = paths.map { URL(fileURLWithPath: $0) }
-        let options = currentPrefs.transferOptions
-        runForeground(title: "Uploading", session: session) { fs, ask, report in
-            try TransferEngine(fs: fs, options: options, ask: ask, report: report).upload(urls, to: panel.path)
-        } completion: { panel.refresh() }
+        let what = urls.count == 1 ? "\"\(urls[0].lastPathComponent)\"" : "\(urls.count) items"
+        promptTarget(title: "Upload \(what) to:", defaultTarget: defaultTarget, upload: true) { [self] choice in
+            if choice.background {
+                tab.queue.add(TransferQueue.Item(upload: urls, to: choice.targetDir, options: choice.options))
+                setQueueVisible(true)
+                return
+            }
+            runForeground(title: "Uploading", session: session) { fs, ask, report in
+                try TransferEngine(fs: fs, options: choice.options, ask: ask, report: report).upload(urls, to: choice.targetDir)
+            } completion: { panel.refresh() }
+        }
     }
 
     private func sessionOf(_ a: FilePanel, _ b: FilePanel) -> RemoteSession? {

@@ -39,6 +39,18 @@ enum DemoScene {
             tab.queue.add(up)
             tab.queue.add(down)
             commander.transfers.setQueueVisible(true)
+
+            // Screenshot variants: the drop prompt, or a name being renamed in place.
+            let args = CommandLine.arguments
+            if args.contains("--demo-drop") {
+                commander.transfers.uploadFromFinder(["/Users/demo/Desktop/invoice.pdf", "/Users/demo/Desktop/logo.png",
+                                                      "/Users/demo/Desktop/notes.txt"],
+                                                     to: tab.remote, defaultTarget: "/var/www/html/assets")
+            }
+            if args.contains("--demo-rename"), let row = tab.local.selectedRow ?? {
+                tab.local.selectNames(["deploy.sh"]); return tab.local.selectedRow }() {
+                tab.local.beginInlineRename(row: row)
+            }
         }
     }
 }

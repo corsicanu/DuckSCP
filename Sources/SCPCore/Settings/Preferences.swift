@@ -44,6 +44,22 @@ public struct Preferences: Codable, Equatable {
     public var transferInBackgroundByDefault = false
     /// The queue list under the panels (shown by default, like WinSCP).
     public var showQueue = true
+    /// Look for a newer release (including pre-releases) when the app starts.
+    public var checkForUpdatesAtLaunch = true
+    /// Recently used transfer targets (most recent first), shared by all sites, like
+    /// WinSCP's target-directory history. Remote targets for uploads, local for downloads.
+    public var remoteTargetHistory: [String] = []
+    public var localTargetHistory: [String] = []
+    public static let historyLimit = 15
+
+    /// Moves `path` to the front of a history list, without duplicates, capped.
+    public static func remember(_ path: String, in list: inout [String]) {
+        let p = path.trimmingCharacters(in: .whitespaces)
+        guard !p.isEmpty else { return }
+        list.removeAll { $0 == p }
+        list.insert(p, at: 0)
+        if list.count > historyLimit { list.removeLast(list.count - historyLimit) }
+    }
     /// 0 = unlimited.
     public var speedLimitKBps = 0
     /// WinSCP-style exclude mask, e.g. "*.tmp; .git/; Thumbs.db".
@@ -79,7 +95,7 @@ public struct Preferences: Codable, Equatable {
         get(.editorBundleIDs, &editorBundleIDs); get(.customEditorPath, &customEditorPath)
         get(.preserveTimestamp, &preserveTimestamp); get(.preservePermissions, &preservePermissions)
         get(.resumeEnabled, &resumeEnabled); get(.resumeThresholdKB, &resumeThresholdKB)
-        get(.transferInBackgroundByDefault, &transferInBackgroundByDefault); get(.showQueue, &showQueue); get(.speedLimitKBps, &speedLimitKBps)
+        get(.transferInBackgroundByDefault, &transferInBackgroundByDefault); get(.showQueue, &showQueue); get(.checkForUpdatesAtLaunch, &checkForUpdatesAtLaunch); get(.remoteTargetHistory, &remoteTargetHistory); get(.localTargetHistory, &localTargetHistory); get(.speedLimitKBps, &speedLimitKBps)
         get(.excludeMask, &excludeMask)
         get(.autoReconnect, &autoReconnect); get(.reconnectAttempts, &reconnectAttempts); get(.reconnectDelaySeconds, &reconnectDelaySeconds)
         get(.connectTimeoutSeconds, &connectTimeoutSeconds); get(.keepaliveSeconds, &keepaliveSeconds); get(.ipVersion, &ipVersion)

@@ -41,6 +41,7 @@ protocol FilePanelDelegate: AnyObject {
     func panelPathDidChange(_ panel: FilePanel)
     func panel(_ panel: FilePanel, didFail error: Error)
     func panelSummaryDidChange(_ panel: FilePanel)
+    func panel(_ panel: FilePanel, rename entry: RemoteEntry, to name: String)
 }
 
 enum PanelCommand { case copy, move, delete, rename, makeDirectory, properties, edit, open, switchPanel }
@@ -51,7 +52,7 @@ enum PanelColumn: String {
 }
 
 /// One side of the Commander window: path bar, file list, status line.
-final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation {
+final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSMenuItemValidation, NSTextFieldDelegate {
     let backend: PanelBackend
     weak var delegate: FilePanelDelegate?
 
@@ -347,11 +348,79 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
         }
     }
 
+    // MARK: Inline rename
+
+    private var renaming: (field: NSTextField, entry: RemoteEntry)?
+
+    /// Turns the name cell into an editor with the base name selected (Finder style).
+    /// Return renames, Escape or clicking away without changes cancels.
+    func beginInlineRename(row: Int) {
+        guard renaming == nil, row >= 0, row < table.numberOfRows, let e = entry(at: row),
+              let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,
+              let field = cell.textField else { return }
+        table.scrollRowToVisible(row)
+        renaming = (field, e)
+        field.isEditable = true
+        field.isSelectable = true
+        field.isBordered = true
+        field.drawsBackground = true
+        field.backgroundColor = .textBackgroundColor
+        field.textColor = .labelColor
+        field.delegate = self
+        field.stringValue = e.name
+        view.window?.makeFirstResponder(field)
+        if let editor = field.currentEditor() {
+            let ext = (e.name as NSString).pathExtension
+            let base = e.isDirectoryLike || ext.isEmpty || e.name.hasPrefix(".") && !e.name.dropFirst().contains(".")
+                ? e.name.count : e.name.count - ext.count - 1
+            editor.selectedRange = NSRange(location: 0, length: (e.name as NSString).substring(to: base).utf16.count)
+        }
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard let r = renaming, control === r.field else { return false }
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            r.field.stringValue = r.entry.name
+            finishInlineRename(commit: false)
+            return true
+        }
+        return false
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let r = renaming, obj.object as? NSTextField === r.field else { return }
+        finishInlineRename(commit: true)
+    }
+
+    private func finishInlineRename(commit: Bool) {
+        guard let r = renaming else { return }
+        renaming = nil
+        let newName = r.field.stringValue.trimmingCharacters(in: .whitespaces)
+        r.field.isEditable = false
+        r.field.isBordered = false
+        r.field.drawsBackground = false
+        r.field.delegate = nil
+        view.window?.makeFirstResponder(table)
+        if commit, !newName.isEmpty, newName != r.entry.name {
+            delegate?.panel(self, rename: r.entry, to: newName)
+        } else {
+            r.field.stringValue = r.entry.name
+            table.reloadData()
+        }
+    }
+
     /// Selects entries by name (used by the demo scene and after renames).
     func selectNames(_ names: Set<String>) {
         var rows = IndexSet()
         for (i, e) in entries.enumerated() where names.contains(e.name) { rows.insert(i + (hasParentRow ? 1 : 0)) }
         table.selectRowIndexes(rows, byExtendingSelection: false)
+    }
+
+    /// The single selected row, if exactly one non-".." row is selected.
+    var selectedRow: Int? {
+        let rows = table.selectedRowIndexes
+        guard rows.count == 1, let r = rows.first, entry(at: r) != nil else { return nil }
+        return r
     }
 
     func selectedPaths() -> [String] { selectedEntries.map { RemotePath.join(path, $0.name) } }
@@ -535,11 +604,16 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
                    proposedDropOperation op: NSTableView.DropOperation) -> NSDragOperation {
         guard (info.draggingSource as? PanelTableView)?.panel !== self else { return [] }
+        // Dropping onto a folder row targets that folder; anywhere else, the open folder.
+        if op == .on, let e = row < tableView.numberOfRows ? entry(at: row) : nil, e.isDirectoryLike {
+            return .copy
+        }
         tableView.setDropRow(-1, dropOperation: .on)
         return .copy
     }
 
-    var onDrop: ((FilePanel, [String], _ fromPanel: FilePanel?) -> Void)?
+    /// (panel, dropped paths, source panel or nil for Finder, suggested target folder)
+    var onDrop: ((FilePanel, [String], _ fromPanel: FilePanel?, _ target: String) -> Void)?
 
     func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int,
                    dropOperation: NSTableView.DropOperation) -> Bool {
@@ -552,7 +626,9 @@ final class FilePanel: NSViewController, NSTableViewDataSource, NSTableViewDeleg
             paths = items.compactMap { $0.string(forType: .fileURL).flatMap { URL(string: $0)?.path } }
         }
         guard !paths.isEmpty else { return false }
-        onDrop?(self, paths, source)
+        var target = path
+        if row >= 0, row < tableView.numberOfRows, let e = entry(at: row), e.isDirectoryLike { target = RemotePath.join(path, e.name) }
+        onDrop?(self, paths, source, target)
         return true
     }
 }
@@ -590,6 +666,30 @@ extension NSPasteboard.PasteboardType {
 
 final class PanelTableView: NSTableView {
     weak var panel: FilePanel?
+    /// Finder's "slow double click": click a selected name again, wait, and it becomes editable.
+    private var pendingRename: DispatchWorkItem?
+
+    override func mouseDown(with event: NSEvent) {
+        pendingRename?.cancel()
+        let point = convert(event.locationInWindow, from: nil)
+        let row = self.row(at: point), col = column(at: point)
+        let wasOnlySelection = row >= 0 && selectedRowIndexes == IndexSet(integer: row)
+        let wasFocused = window?.firstResponder === self
+        let start = NSEvent.mouseLocation
+        super.mouseDown(with: event) // returns on mouse up (or after a drag)
+        let moved = hypot(NSEvent.mouseLocation.x - start.x, NSEvent.mouseLocation.y - start.y) > 3
+        guard event.clickCount == 1, wasOnlySelection, wasFocused, !moved, col == 0,
+              selectedRowIndexes == IndexSet(integer: row) else { return }
+        let work = DispatchWorkItem { [weak self] in self?.panel?.beginInlineRename(row: row) }
+        pendingRename = work
+        // Wait out the double-click interval, so a double click still opens the item.
+        DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval + 0.05, execute: work)
+    }
+
+    func cancelPendingRename() {
+        pendingRename?.cancel()
+        pendingRename = nil
+    }
 
     override func becomeFirstResponder() -> Bool {
         let ok = super.becomeFirstResponder()
@@ -598,6 +698,7 @@ final class PanelTableView: NSTableView {
     }
 
     override func keyDown(with event: NSEvent) {
+        cancelPendingRename()
         if panel?.handleKey(event) != true { super.keyDown(with: event) }
     }
 }

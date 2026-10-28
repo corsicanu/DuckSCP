@@ -59,6 +59,7 @@ final class PreferencesWindowController: NSWindowController {
                 popup("Accent color:", [("Follow macOS (blue if none set)", Preferences.AccentMode.system),
                                         ("Custom", .custom)], \.accentMode),
                 [label("Custom color:"), accentWell()],
+                check("Check for updates when DuckSCP starts (pre-releases are marked)", \.checkForUpdatesAtLaunch),
             ]),
             ("Confirmations", [
                 check("Confirm deleting files", \.confirmDelete),

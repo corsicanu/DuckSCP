@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source ./branding.env
+APP_VERSION="${APP_VERSION_OVERRIDE:-$APP_VERSION}"
 
 scripts/build_app.sh
 # Package from a clean copy outside the repo: ~/Desktop may attach Finder metadata

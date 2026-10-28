@@ -11,9 +11,11 @@ It imports your existing `WinSCP.ini` sites, including saved passwords, workspac
 
 ## Install
 
-1. Download `DuckSCP-1.0.0-macOS-arm64.dmg` from [Releases](../../releases).
+1. Download the latest `DuckSCP-<version>-macOS-arm64.dmg` from [Releases](../../releases).
 2. Open it and drag **DuckSCP** to **Applications**.
 3. First launch only: Control-click DuckSCP → **Open** → **Open**. DuckSCP is signed but not notarized, so macOS asks once. If there's no Open button, use **System Settings → Privacy & Security → Open Anyway**.
+
+After that, DuckSCP keeps itself up to date (see *Updates* below).
 
 Apple Silicon, tested on macOS 27. To uninstall, delete the app. Your sites live in `~/Library/Application Support/DuckSCP`, and their passwords are in the Keychain under `ro.corsicanu.duckscp.sites`.
 
@@ -152,7 +154,7 @@ Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional
 
 | Key | Command |
 |---|---|
-| F2 | Rename |
+| F2 | Rename in place (or click a selected name again, like Finder) |
 | F4 | Edit in Sublime Text, falling back to TextEdit. Remote files upload on every save, whether the editor saves in place (Sublime's default) or by replacing the file; the status bar shows "Uploaded …" and each save appears in the transfer queue as "name (edited)". |
 | F5 / F6 | Copy / Move to the other panel |
 | F7 | New folder |
@@ -161,7 +163,15 @@ Per site (Advanced…): **proxy** (SOCKS4, SOCKS5 or HTTP CONNECT, with optional
 | Tab | Switch panel |
 | Return / Backspace | Open / parent directory |
 
-On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag files between panels or in from Finder.
+On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu.
+
+**Rename like Finder:** click a file to select it, then click its name again. After a moment the name becomes editable, with the part before the extension selected. Return saves, Escape cancels.
+
+**Drag and drop:** drag between the panels, or from Finder onto the remote panel. Every drop asks where to put the files, like WinSCP:
+- **Suggested:** the folder you dropped on, or the open folder.
+- **History:** recent target folders, shared by all sites and not checked against the server.
+- **Type:** any other path.
+- **Choose…:** browse to a local folder, for downloads.
 
 **Synchronize** (toolbar or ⌥⌘S) compares the local and remote folders recursively by modification time, size, or both. Directions:
 - **Both:** the newer side wins.
@@ -185,6 +195,14 @@ On a Mac keyboard, hold **fn** for the F-keys, or use the **Files** menu. Drag f
 **Background transfers:** tick *Transfer in background* in the Copy/Move dialog to send an item to the queue. Each tab's queue uses its own second connection, opened with the answers you already gave (password, key passphrase, host key), so browsing stays responsive. Right-click a queue item to cancel it or clear finished ones.
 
 Transfers over 100 KB go through a `.filepart` temp file and are renamed when complete. An interrupted download resumes from the `.filepart` on the next attempt.
+
+## Updates
+
+On launch, DuckSCP checks the repository set in `branding.env` (`UPDATE_REPO`) for a newer release. You can also check from the app menu with **Check for Updates…**.
+- **Pre-releases** are offered too, with a warning that they may contain bugs or untested features.
+- **Update** downloads the package for your Mac and verifies it: SHA-256 against the release's `SHA256SUMS.txt`, a valid code signature, the same bundle id, and the version the release claims. DuckSCP then quits, replaces itself and reopens.
+- **Falls back** to the release page if DuckSCP can't replace itself, for example when run from the disk image or a read-only folder.
+- **Off switch:** Preferences → Environment.
 
 ## Connecting
 
